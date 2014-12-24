@@ -1,0 +1,23 @@
+#!/bin/sh
+
+ifconfig eth0 10.50.0.1/24 
+ifconfig eth1 10.50.1.1/24 
+
+# source IP 10.50.0.1 -> 10.60.0.1 when going to 10.60.1.1
+iptables -t nat -A POSTROUTING -s 10.50.0.1 -d 10.60.1.1 -j SNAT --to-source 10.60.0.1
+# nat inbound 10.60.0.1 -> 10.50.0.1
+iptables -t nat -A PREROUTING -d 10.60.0.1 -j DNAT --to-destination 10.50.0.1 
+
+# source IP 10.50.1.1 -> 10.60.1.1 when going to 10.60.0.1
+iptables -t nat -A POSTROUTING -s 10.50.1.1 -d 10.60.0.1 -j SNAT --to-source 10.60.1.1
+# nat inbound 10.60.1.1 -> 10.50.1.1
+iptables -t nat -A PREROUTING -d 10.60.1.1 -j DNAT --to-destination 10.50.1.1 
+
+ip route add 10.60.1.1 dev eth0
+arp -i eth0 -s 10.60.1.1 aa:00:cc:dd:ee:ff
+
+ip route add 10.60.0.1 dev eth1
+arp -i eth1 -s 10.60.0.1 aa:bb:cc:dd:ee:ff
+
+echo "IP address 10.50.0.1 is translated to 10.60.0.1 and 10.50.1.1 to 10.60.1.1"
+echo "Try ping 10.60.0.1 and ping 10.60.1.1 to see ping packets going to hardware"

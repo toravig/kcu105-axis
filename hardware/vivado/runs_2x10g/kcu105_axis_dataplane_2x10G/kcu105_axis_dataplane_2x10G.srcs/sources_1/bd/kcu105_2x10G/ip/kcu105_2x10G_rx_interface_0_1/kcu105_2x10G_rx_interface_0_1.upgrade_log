@@ -1,0 +1,58 @@
+Copyright 1986-2014 Xilinx, Inc. All Rights Reserved.
+----------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2014.3 (lin64) Build 1034051 Fri Oct  3 16:32:59 MDT 2014
+| Date         : Sat Nov 22 14:37:18 2014
+| Host         : xhd-ips64re07 running 64-bit Red Hat Enterprise Linux Client release 5.9 (Tikanga)
+| Command      : upgrade_ip
+| Device       : xcku040-ffva1156-2-e
+----------------------------------------------------------------------------------------------------
+
+Upgrade Log for IP 'kcu105_2x10G_rx_interface_0_1'
+
+1. Summary
+----------
+
+SUCCESS in the upgrade of kcu105_2x10G_rx_interface_0_1 (xilinx.com:user:rx_interface:1.0) from (Rev. 9) to (Rev. 10)
+
+
+
+
+
+
+Copyright 1986-2014 Xilinx, Inc. All Rights Reserved.
+-----------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2014.3 (lin64) Build 1034051 Fri Oct  3 16:32:59 MDT 2014
+| Date         : Sat Nov 22 14:32:44 2014
+| Host         : xhdl2267 running 64-bit Red Hat Enterprise Linux Client release 5.9 (Tikanga)
+| Command      : upgrade_ip
+| Device       : xcku040-ffva1156-2-e
+-----------------------------------------------------------------------------------------------
+
+Upgrade Log for IP 'kcu105_2x10G_rx_interface_0_1'
+
+1. Summary
+----------
+
+SUCCESS in the upgrade of kcu105_2x10G_rx_interface_0_1 (xilinx.com:user:rx_interface:1.0) from (Rev. 10) to (Rev. 9)
+
+
+
+
+
+
+Copyright 1986-2014 Xilinx, Inc. All Rights Reserved.
+-----------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2014.3 (lin64) Build 1034051 Fri Oct  3 16:32:59 MDT 2014
+| Date         : Sat Nov 22 14:05:39 2014
+| Host         : xhd-lin64re104 running 64-bit Red Hat Enterprise Linux Client release 5.9 (Tikanga)
+| Command      : upgrade_ip
+| Device       : xcku040-ffva1156-2-e
+-----------------------------------------------------------------------------------------------------
+
+Upgrade Log for IP 'kcu105_2x10G_rx_interface_0_1'
+
+1. Summary
+----------
+
+SUCCESS in the upgrade of kcu105_2x10G_rx_interface_0_1 (xilinx.com:user:rx_interface:1.0) from (Rev. 9) to (Rev. 10)
+

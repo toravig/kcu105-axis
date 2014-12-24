@@ -1,0 +1,99 @@
+{
+   guistr: "# # String gsaved with Nlview 6.4.7  2014-07-30 bk=1.3165 VDI=35 GEI=35 GUI=JA:1.8
+#  -string -flagsOSRD
+preplace port user_resetn -pg 1 -y 710 -defaultsOSRD
+preplace port c2s_dre_m_axis -pg 1 -y 390 -defaultsOSRD
+preplace port tx_disable -pg 1 -y 530 -defaultsOSRD
+preplace port resetdone -pg 1 -y 250 -defaultsOSRD
+preplace port clk_156_reset -pg 1 -y 650 -defaultsOSRD
+preplace port txusrclk_out -pg 1 -y 610 -defaultsOSRD
+preplace port txusrclk2_out -pg 1 -y 630 -defaultsOSRD
+preplace port clk_156_resetn -pg 1 -y 670 -defaultsOSRD
+preplace port txn -pg 1 -y 550 -defaultsOSRD
+preplace port sim_speedup_control -pg 1 -y 300 -defaultsOSRD
+preplace port s_axi -pg 1 -y 100 -defaultsOSRD
+preplace port txuserrdy_out -pg 1 -y 590 -defaultsOSRD
+preplace port qpll0outclk_out -pg 1 -y 190 -defaultsOSRD
+preplace port gtrxreset_out -pg 1 -y 130 -defaultsOSRD
+preplace port s_axis_pause -pg 1 -y 120 -defaultsOSRD
+preplace port user_clk -pg 1 -y 690 -defaultsOSRD
+preplace port txp -pg 1 -y 570 -defaultsOSRD
+preplace port reset_counter_done_out -pg 1 -y 230 -defaultsOSRD
+preplace port qpll0outrefclk_out -pg 1 -y 210 -defaultsOSRD
+preplace port s2c_dre_s_axis -pg 1 -y 670 -defaultsOSRD
+preplace port rxn -pg 1 -y 260 -defaultsOSRD
+preplace port mac_areset -pg 1 -y 140 -defaultsOSRD
+preplace port gttxreset_out -pg 1 -y 150 -defaultsOSRD
+preplace port rxp -pg 1 -y 280 -defaultsOSRD
+preplace port qpll0lock_out -pg 1 -y 170 -defaultsOSRD
+preplace port clk_156 -pg 1 -y 510 -defaultsOSRD
+preplace port refclk_diff_port -pg 1 -y 80 -defaultsOSRD
+preplace portBus mac_id -pg 1 -y 480 -defaultsOSRD
+preplace portBus core_status -pg 1 -y 110 -defaultsOSRD
+preplace portBus prtad -pg 1 -y 160 -defaultsOSRD
+preplace inst c2s_dre|axis_dwidth_converter_0 -pg 1 -lvl 3 -y 350 -defaultsOSRD
+preplace inst c2s_dre|rx_interface_0 -pg 1 -lvl 1 -y 320 -defaultsOSRD
+preplace inst logic_low_8bit -pg 1 -lvl 1 -y 480 -defaultsOSRD
+preplace inst c2s_dre|axis_clock_converter_0 -pg 1 -lvl 2 -y 330 -defaultsOSRD
+preplace inst reset_156_inv -pg 1 -lvl 2 -y 610 -defaultsOSRD
+preplace inst mac_phy_ch0 -pg 1 -lvl 2 -y 230 -defaultsOSRD
+preplace inst c2s_dre -pg 1 -lvl 3 -y 320 -regy -120 -defaultsOSRD
+preplace inst s2c_dre -pg 1 -lvl 1 -y 710 -defaultsOSRD
+preplace inst logic_low -pg 1 -lvl 1 -y 380 -defaultsOSRD
+preplace inst logic_high -pg 1 -lvl 1 -y 200 -defaultsOSRD
+preplace netloc Conn1 1 0 1 N
+preplace netloc mac_phy_ch0_core_status 1 2 2 960 30 NJ
+preplace netloc c2s_dre|mac_phy_ch0_core_clk156_out 1 0 2 1690 470 2090
+preplace netloc Conn2 1 3 1 2710
+preplace netloc mac_phy_ch0_core_clk156_out1 1 0 4 240 600 570 470 990 640 NJ
+preplace netloc c2s_dre|pcie_dma_wrapper_0_user_clk 1 0 3 NJ 460 2060 230 NJ
+preplace netloc c2s_dre|mac_phy_ch0_areset_clk156_out 1 0 1 1700
+preplace netloc c2s_dre|mac_id_cons_const 1 0 1 1640
+preplace netloc Conn3 1 0 2 NJ 260 500
+preplace netloc rxp_1 1 0 2 NJ 310 580
+preplace netloc reset_156_inv_Res 1 0 4 260 610 600 560 950 670 NJ
+preplace netloc mac_phy_ch0_reset_counter_done_out 1 2 2 1050 90 NJ
+preplace netloc mac_id_1 1 0 3 NJ 330 NJ 490 1040
+preplace netloc logic_low_8bit_const 1 1 1 510
+preplace netloc c2s_dre|axis_clock_converter_0_M_AXIS 1 2 1 N
+preplace netloc sim_speedup_control_1 1 0 2 NJ 320 500
+preplace netloc rxn_1 1 0 2 NJ 300 550
+preplace netloc logic_low_const 1 1 2 500 500 960
+preplace netloc c2s_dre|rx_interface_0_m_axis 1 1 1 N
+preplace netloc c2s_dre|logic_high_const 1 0 1 1650
+preplace netloc pcie_dma_wrapper_0_user_clk 1 0 3 210 580 NJ 550 1020
+preplace netloc c2s_dre|logic_low_const 1 0 1 1710
+preplace netloc prtad_1 1 0 2 NJ 290 540
+preplace netloc mac_phy_ch0_txn 1 2 2 1090 120 NJ
+preplace netloc mac_phy_ch0_tx_disable 1 2 2 1070 110 NJ
+preplace netloc mac_phy_ch0_resetdone 1 2 2 1060 100 NJ
+preplace netloc mac_phy_ch0_qpll0outclk_out 1 2 2 1030 70 NJ
+preplace netloc logic_high_const 1 1 2 530 480 1060
+preplace netloc areset_1 1 0 2 NJ 280 520
+preplace netloc c2s_dre|axis_dwidth_converter_0_M_AXIS 1 3 1 N
+preplace netloc c2s_dre|mac_phy_ch0_rx_statistics_valid 1 0 1 1680
+preplace netloc refclk_diff_port_1 1 0 2 NJ 250 490
+preplace netloc mac_phy_ch0_gttxreset_out 1 2 2 1010 50 NJ
+preplace netloc c2s_dre|mac_phy_ch0_rx_statistics_vector 1 0 1 1670
+preplace netloc mac_phy_ch0_txp 1 2 2 1100 130 NJ
+preplace netloc mac_phy_ch0_rx_statistics_valid 1 2 1 1080
+preplace netloc c2s_dre|mac_phy_ch0_m_axis_rx 1 0 1 N
+preplace netloc mac_phy_ch0_txusrclk_out 1 2 2 1130 160 NJ
+preplace netloc mac_phy_ch0_gtrxreset_out 1 2 2 980 40 NJ
+preplace netloc mac_phy_ch0_txusrclk2_out 1 2 2 1120 150 NJ
+preplace netloc mac_phy_ch0_areset_clk156_out 1 1 3 610 660 970 650 NJ
+preplace netloc c2s_dre|reset_156_inv_Res 1 0 2 NJ 480 2080
+preplace netloc tx_packet_fifo_M_AXIS 1 1 1 560
+preplace netloc mac_phy_ch0_txuserrdy_out 1 2 2 1110 140 NJ
+preplace netloc mac_phy_ch0_qpll0outrefclk_out 1 2 2 1040 80 NJ
+preplace netloc s_axis_pause_1 1 0 2 NJ 270 510
+preplace netloc mac_phy_ch0_rx_statistics_vector 1 2 1 980
+preplace netloc c2s_dre|M01_ARESETN_1 1 0 3 NJ 450 2070 240 NJ
+preplace netloc mac_phy_ch0_m_axis_rx 1 2 1 1000
+preplace netloc mac_phy_ch0_qpll0lock_out 1 2 2 1020 60 NJ
+preplace netloc M01_ARESETN_1 1 0 3 220 590 590 460 1130
+levelinfo -pg 1 180 380 780 2110 2840
+levelinfo -hier c2s_dre 1620 1890 2200 2420 2550
+",
+}
+0

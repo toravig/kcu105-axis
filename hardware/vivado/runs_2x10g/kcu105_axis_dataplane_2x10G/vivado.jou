@@ -1,0 +1,18 @@
+#-----------------------------------------------------------
+# Vivado v2014.3 (64-bit)
+# SW Build 1034051 on Fri Oct  3 16:32:59 MDT 2014
+# IP Build 1028902 on Fri Sep 26 17:35:13 MDT 2014
+# Start of session at: Sat Nov 22 14:34:35 2014
+# Process ID: 6933
+# Log file: /wrk/paeg/users/keshava/ultrascale/2014.3/release/package/kcu105_axis_dataplane/hardware/vivado/runs_2x10g/kcu105_axis_dataplane_2x10G/vivado.log
+# Journal file: /wrk/paeg/users/keshava/ultrascale/2014.3/release/package/kcu105_axis_dataplane/hardware/vivado/runs_2x10g/kcu105_axis_dataplane_2x10G/vivado.jou
+#-----------------------------------------------------------
+source "/home/keshava/.Xilinx/Vivado/init.tcl"
+start_gui
+open_project kcu105_axis_dataplane_2x10G.xpr
+open_bd_design {/wrk/paeg/users/keshava/ultrascale/2014.3/release/package/kcu105_axis_dataplane/hardware/vivado/runs_2x10g/kcu105_axis_dataplane_2x10G/kcu105_axis_dataplane_2x10G.srcs/sources_1/bd/kcu105_2x10G/kcu105_2x10G.bd}
+ipx::edit_ip_in_project -upgrade true -name rx_interface_v1_0_project -directory /wrk/paeg/users/keshava/ultrascale/2014.3/release/package/kcu105_axis_dataplane/hardware/sources/ip_package/rx_interface_v1_0/rx_interface_v1_0_project /wrk/paeg/users/keshava/ultrascale/2014.3/release/package/kcu105_axis_dataplane/hardware/sources/ip_package/rx_interface_v1_0/component.xml
+update_compile_order -fileset sim_1
+ipx::check_integrity -quiet [ipx::current_core]
+ipx::archive_core /wrk/paeg/users/keshava/ultrascale/2014.3/release/hardware/sources/ip_package/rx_interface_v1_0/xilinx.com_user_rx_interface_1.0.zip [ipx::current_core]
+ipx::update_ip_instances -delete_project true -set_repo_paths false
