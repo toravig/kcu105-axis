@@ -53,24 +53,6 @@
 #endif
 
 
-//#define PUMP_APP_DBG_PRNT
-#if defined (GEN)
-bool tx_channel[] = {true,false,false,false}; //All 4 channels pump data
-#elif defined (CHK)
-bool tx_channel[] = {false,true,false,false}; //All 4 channels pump data
-#else
-bool tx_channel[] = {true,true,false,false}; //All 4 channels pump data
-#endif
-
-#if defined (GEN)
-bool rx_channel[] = {true,false,false,false}; 
-#elif defined (CHK)
-bool rx_channel[] = {false,true,false,false}; 
-#else
-bool rx_channel[] = {true,true,false,false}; 
-#endif
-
-
 unsigned int tx_channel_num_empty_bds[] = {NUM_Q_ELEM - 2,NUM_Q_ELEM - 2,NUM_Q_ELEM - 2,NUM_Q_ELEM - 2}; //NOTE::::We can fill (Q len - 1) BD elements in rx side at start of day
 unsigned int tx_auxchannel_num_empty_bds[] = {NUM_Q_ELEM - 2,NUM_Q_ELEM - 2,NUM_Q_ELEM - 2,NUM_Q_ELEM - 2}; //NOTE::::We can fill (Q len - 1) BD elements in rx side at start of day
 

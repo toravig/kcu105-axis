@@ -31,19 +31,12 @@
 
 /* Testing and debug related defines */
 #ifdef TEST_DBG_ON
-#ifdef XILINX_PCIE_EP
-#define RX_SIDE_DATA_PUMP_TEST //We are to receieve data
-#define TX_SIDE_DATA_PUMP_TEST //We are to transmit data
-#endif
 
 
 
 #define COALESE_CNT (0)
 
 
-#ifdef XILINX_PCIE_EP
-#define AXI_PERF_MON //AXI perf mone is enabled
-#endif
 
 /* AXI performance monitor related defines */
 #ifdef AXI_PERF_MON
@@ -57,16 +50,10 @@
 #endif
 
 
-#ifdef XILINX_PCIE_EP
-//#define EP_APP //A simple loopback application on EP for Raw data
-//#define TEST_CODE //We are currently testing the driver
-//#define POLL_MODE //Do interrupt polling
 
-#else
 //#define HOST_APP //A simple loopback application on EP for Raw data
 //#define USE_MSIX /* Use MSIX interrupt vector associated with each channel */
 //#define NUM_MSIX_VECS (PS_PCIE_NUM_DMA_CHANNELS)/* Number of MSIx vectors */
-#endif
 
 
 
@@ -77,7 +64,6 @@
 
 
 
-#ifndef XILINX_PCIE_EP
 #define PCI_VENDOR_XILINX (0x10EE)
 
 /* Supported device ids */
@@ -85,7 +71,6 @@
 #define NWL_DMA_VAL_DEVID_VIDEO (0x8043)
 #define NWL_DMA_x4G1_PFMON_DEVID (0x7024) //x4g1 perfmon
 #define NWL_DMA_HW_SGL_CNTRL (0x8082) //SGL controlled by HW logic
-#endif
 
 /* 
  * Number of packets after which post processing worker thread must yield. This needs to be tuned
@@ -316,59 +301,7 @@ typedef union
     u8 *ptr_q;
 }dataq_ptr_t;
 
-#ifdef XILINX_PCIE_EP
 
-#define EP_DMA_IRQ_NO (91)
-
-#define EP_AXI_DOMAIN_ADDR (0x44A00000)
-
-/* EP DMA register */
-#define PS_PCIE_REG_AXI_BASE_ADDR (0x43C10000)	//DMA register base address
-
-/* Endpoint bridge registers related defines */
-#define EP_BRDG_REG_BASE_ADDR (0x43C00000)
-#define EP_BRDG_REG_MAP_SZ (1024 * 64) //Bridge register map is 64KB size
-#define EP_BRDG_TRANS_SIZE_64_VAL	(4)//12 + EP_BRDG_TRANS_SIZE_64_VAL == 16. 2 ^ 16 == 64KB
-									   // 
-
-
-#define EP_BRDG_REG_CAP_OFFSET	(0x200) //Bridge capabilities offset
-#define EP_BRDG_REG_CTRL_OFFSET	(0x208) //Bridge registers control
-#define EP_BRDG_REG_TRANS_BA_LO_OFFSET (0x210) //Bridge register translation source base address low
-#define EP_BRDG_REG_TRANS_BA_HI_OFFSET (0x214) //Bridge register translation source base address high
-#define EP_BRDG_REG_ECAM_CAP_OFFSET (0x220)	//Bridge register ECAM capabilities offset
-#define EP_BRDG_REG_ECAM_CNTRL_OFFSET (0x228) //ECAM control offset
-#define EP_BRDG_REG_ECAM_BA_LO_OFFSET (0x230)	//ECAM register base address low
-#define EP_BRDG_REG_ECAM_BA_HI_OFFSET (0x234)	//ECAM register base address low
-#define EP_BRDG_REG_DREG_CAP_OFFSET (0x280) //DREG capabilities offset 
-#define EP_BRDG_REG_DREG_CNTRL_OFFSET (0x288) //DREG control 
-#define EP_BRDG_REG_DREG_BA_LO_OFFSET (0x290)	//DREG register base address low
-#define EP_BRDG_REG_DREG_BA_HI_OFFSET (0x294)	//DREG register base address low
-
-#define EP_BRDG_REG_MSGF_MSK_OFFSET (0x464) //MSGF DMA mask register offset
-// 
-#define EP_TRANX_INGR_CAP_0 (0x800)
-#define EP_TRANX_INGR_CNTRL_0 (0x808) 
-#define EP_TRANX_INGR_SRC_BASE_LO_0 (0x810)
-#define EP_TRANX_INGR_SRC_BASE_HI_0 (0x814)
-#define EP_TRANX_INGR_DST_BASE_LO_0 (0x818)
-#define EP_TRANX_INGR_DST_BASE_HI_0 (0x81C)
-
-#define EP_INGRESS_PRESENT_BIT (1 << 0)
-#define EP_ENABLE_INGRESS (1 << 0)
-												 
-												
-#define EP_BRDG_BREG_PRESENT_BIT (1 << 0) //Bridge present bit
-#define EP_BRDG_ENABLE_BIT (1 << 0) //Bridge enable bit
-#define EP_BRDG_ECAM_PRESENT_BIT (1 << 0) //ECAM present bit
-#define EP_BRDG_ECAM_ENABLE_BIT (1 << 0) //ECAM enable bit
-#define EP_BRDG_DREG_PRESENT_BIT (1 << 0) //DREG present bit
-#define EP_BRDG_DREG_ENABLE_BIT (1 << 0) //DREG enable bit
-#define EP_BRDG_TRANS_SZ_BITS_SHIFT (16) //Translation size bit starts at 16
-#define EP_BRDG_SRC_BASE_LO_BITS_SHIFT (12) //Source base address lo shift
-#define EP_BRDG_MSGFDMAMSK_INTREN_BIT (1 << 0) //Enable interrupt bit
-
-#endif
 
 /*
 * This enumeration lists the DMA channels
@@ -556,10 +489,6 @@ typedef struct _ps_pcie_dma_desc
 	u8 __iomem *dma_reg_virt_base_addr; //Virtual Base address of the DMA registers
 	unsigned long dma_chann_reg_phy_base_addr; //Physical Base address of the DMA Channel registers
 	u8 __iomem *dma_chann_reg_virt_base_addr; //Virtual Base address of the DMA Channel registers
-#ifdef XILINX_PCIE_EP
-	unsigned long ep_bridge_reg_base_addr; //Endpoint side bridge register physical base address
-	u8 __iomem *ep_bridge_reg_virt_base_addr; //Virtual Base address of the DMA registers
-#endif
 	spinlock_t dma_lock; //lock
 }ps_pcie_dma_desc_t;
 
@@ -575,9 +504,7 @@ typedef union
 }xlnx_device_t;
 
 
-#ifdef XILINX_PCIE_EP
 
-#else
 /*
 * APIs exported only on Host platform
 */
@@ -585,7 +512,6 @@ struct pci_device *xlnx_get_pcie_devs(u16 dev_id, u16 vendor_id);//Invoked by ho
 																	//with matching device and vendor id combination
 																	//The pcie devices are probed by the dma driver
 																	// NULL 
-#endif
 
 
 /* 

@@ -46,22 +46,7 @@
 
 #define GEN_CHK_BUF_ADDR GC_BUFF_ADDR 
 
-//#define PUMP_APP_DBG_PRNT
-#if defined (GEN)
-bool tx_channel[] = {true,false,false,false}; //All 4 channels pump data
-#elif defined (CHK)
-bool tx_channel[] = {false,true,false,false}; //All 4 channels pump data
-#else
-bool tx_channel[] = {true,true,false,false}; //All 4 channels pump data
-#endif
 
-#if defined (GEN)
-bool rx_channel[] = {true,false,false,false}; 
-#elif defined (CHK)
-bool rx_channel[] = {false,true,false,false}; 
-#else
-bool rx_channel[] = {true,true,false,false}; 
-#endif
 
 
 unsigned int tx_channel_num_empty_bds[] = {NUM_Q_ELEM - 2,NUM_Q_ELEM - 2,NUM_Q_ELEM - 2,NUM_Q_ELEM - 2}; //NOTE::::We can fill (Q len - 1) BD elements in rx side at start of day
@@ -173,70 +158,6 @@ unsigned int ReadIndex;
 unsigned int RxWriteIndex;
 unsigned int RxReadIndex;
 
-
-
-
-struct timer_list io_check_timer;
-
-void io_check_timer_fn(unsigned long arg)
-{
-	ps_pcie_dma_desc_t* ptr_dma_desc = (ps_pcie_dma_desc_t*)arg;
-	int i;
-	unsigned int num_pkts;
-	unsigned int saturate = false;
-	unsigned long flags;
-	unsigned int tot_ios_interval = 0;
-
-    for(i = 0; i < 2 ; i++) 
-	{
-		if((&ptr_dma_desc->channels[i])->channel_is_active == false) 
-		{
-			continue;
-		}
-
-		spin_lock(&(&ptr_dma_desc->channels[i])->channel_lock);
-
-		if((&ptr_dma_desc->channels[i])->num_pkts_io) 
-		{
-			if((&ptr_dma_desc->channels[i])->prev_num_pkts_io == (&ptr_dma_desc->channels[i])->num_pkts_io) 
-			{
-				printk(KERN_ERR"\n --> IOs stalled for channel %d State %d Wake-up-cnt %u %u %u %u Interrupted-%d\n", (&ptr_dma_desc->channels[i])->chann_id,(&ptr_dma_desc->channels[i])->chann_state,
-					   (&ptr_dma_desc->channels[i])->wake_up_count,(&ptr_dma_desc->channels[i])->bds_alloc,(&ptr_dma_desc->channels[i])->bds_freed,(&ptr_dma_desc->channels[i])->cbk_called,
-					   (&ptr_dma_desc->channels[i])->interrupted);
-				printk(KERN_ERR"\n --> IOs stalled for channel %d State %d Wake-up-cnt %u %u %u %u Interrupted-%d\n", (&ptr_dma_desc->aux_channels[i])->chann_id,(&ptr_dma_desc->aux_channels[i])->chann_state,
-					   (&ptr_dma_desc->aux_channels[i])->wake_up_count,(&ptr_dma_desc->aux_channels[i])->bds_alloc,(&ptr_dma_desc->aux_channels[i])->bds_freed,(&ptr_dma_desc->aux_channels[i])->cbk_called,
-					   (&ptr_dma_desc->aux_channels[i])->interrupted);
-				printk(KERN_ERR"\n Tx Channel %d Tx Aux channel %d RxChannel %d RxAuxChannel %d \n ",tx_channel_num_empty_bds[i],tx_auxchannel_num_empty_bds[i],rx_channel_num_empty_bds,rx_auxchannel_num_empty_bds[i]);
-				//stop_prints = true;
-				//spin_unlock(&(&ptr_dma_desc->channels[i])->channel_lock);
-				//return;
-			}
-			else
-			{
-				tot_ios_interval = tot_ios_interval + ((&ptr_dma_desc->channels[i])->num_pkts_io - (&ptr_dma_desc->channels[i])->prev_num_pkts_io);
-				(&ptr_dma_desc->channels[i])->prev_num_pkts_io = (&ptr_dma_desc->channels[i])->num_pkts_io;
-				
-			}
-		}
-
-		(&ptr_dma_desc->channels[i])->interrupted = 0;
-
-		//spin_lock(&(&ptr_dma_desc->channels[i])->channel_lock);
-		num_pkts = (&ptr_dma_desc->channels[i])->num_pkts_io;
-		saturate = (&ptr_dma_desc->channels[i])->saturate_flag;
-		(&ptr_dma_desc->channels[i])->saturate_flag = false;
-		spin_unlock(&(&ptr_dma_desc->channels[i])->channel_lock);
-        //ptr_temp_chann_desc = &ptr_dma_desc->channels[i];
-               printk(KERN_ERR"\n Tx Channel %d Tx Aux channel %d RxChannel %d RxAuxChannel %d \n ",tx_channel_num_empty_bds[i],tx_auxchannel_num_empty_bds[i],rx_channel_num_empty_bds,rx_auxchannel_num_empty_bds[i]);
-		printk(KERN_ERR"\n --> Channel %d IOs %u Q satuared %d\n",(&ptr_dma_desc->channels[i])->chann_id,num_pkts,saturate);
-	}
-
-	printk(KERN_ERR"\n --> Total IOs this sampling interval %u\n",tot_ios_interval);
-
-
-	io_check_timer.expires = jiffies + (HZ*4); /* parameter */
-	add_timer(&io_check_timer);
-}
 
 
 /* 
@@ -1258,13 +1179,6 @@ xraw_dev_open (struct inode *in, struct file *filp)
   int cpu_id = 0;
  
     /* Allowing more than one Application accesing the driver */
-#if 0
-  if (xraw_UserOpen)
-    {                                          /* To prevent more than one GUI */
-      printk ("Device already in use\n");
-      return -EBUSY;
-    }
-#endif
   
   xraw_UserOpen++;		  
 
@@ -1926,15 +1840,6 @@ int host_pump_driver_init(void)
 				printk(KERN_ERR"\n Could not activate Rx Channel  %d channel %d\n",retval);
 				goto channel_act_failed;
 			}
-#if 0
-	/* Start a periodic timer to record number of packet io */
-		init_timer(&io_check_timer);
-		io_check_timer.function = io_check_timer_fn;
-		io_check_timer.data = (void*)ptr_dma_desc;
-		io_check_timer.expires = jiffies + HZ*2; /* parameter */
-		printk(KERN_ERR"\n- Invoke io check timer %p\n", &io_check_timer);
-		add_timer(&io_check_timer);
-#endif	
 	printk(KERN_ERR"\n --> Module Host pump on all 4 channels loaded %d", retval);
 		
 
@@ -2067,11 +1972,9 @@ static void host_pump_driver_exit(void)
 	
 }
 
-#ifndef XILINX_PCIE_EP
 module_init(host_pump_driver_init);
 module_exit(host_pump_driver_exit);
 
 MODULE_DESCRIPTION("Xilinx PS PCIe DMA driver");
 MODULE_AUTHOR("Xilinx");
 MODULE_LICENSE("GPL");
-#endif
