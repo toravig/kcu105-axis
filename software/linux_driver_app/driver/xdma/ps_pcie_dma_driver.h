@@ -18,8 +18,12 @@
 #define AXI_DOMAIN_ADDR (0x44A00000)
 #define CFG_AXI_MASTER  0x08
 #define CFG_PCIE_CREDIT 0x28
-
+#ifdef HW_SGL_DESIGN
+#define MAX_RW_AXI_MM 	0x22
+#endif
+#if defined(DDR_DESIGN) || defined (PFORM_USCALE_NO_EP_PROCESSOR)
 #define MAX_RW_AXI_MM 	0x33
+#endif 
 #define FC_COMP_HEADER_DATA 0x806003E0
 /* Defines */
 #define PS_PCIE_NUM_DMA_CHANNELS (4) //4 DMA channels
@@ -147,16 +151,17 @@
 
 #define OFFSET_INGR_AXI_CTRL	0x00000008 /**< Ingress AXI translation Control Offser */
 #define OFFSET_INGR_AXI_SRC_LO   0x00000010 /**< Ingress AXI transaltion Source Base low */
+#define OFFSET_INGR_AXI_SRC_HI   0x00000014 /**< Ingress AXI transaltion Source Base high */
 #define OFFSET_INGR_AXI_DST_LO   0x00000018 /**< Ingress AXI transaltion Destination  Base low */
 
 
 /** PVTMON Macros */
-#define    PVTMON_BASE			0x2000
-#define	PVTMON_VCCINT 		0x040
+#define   	 PVTMON_BASE			0x2000
+#define		PVTMON_VCCINT 		0x040
 #define 	PVTMON_VCCAUX 		0x044
-#define	PVTMON_VCC3 			0x048
+#define		PVTMON_VCC3 			0x048
 #define 	PVTMON_VADJ 			0x04C
-#define	PVTMON_VCC1 			0x050
+#define		PVTMON_VCC1 			0x050
 #define 	PVTMON_VCC2 			0x054
 #define 	PVTMON_MGT_AVCC 		0x058
 #define 	PVTMON_MGT_AVTT 		0x05C
@@ -485,9 +490,9 @@ typedef struct _ps_pcie_dma_desc
 	u8 __iomem *cntrl_func_virt_base_addr; //Virtual Base address of the AXI control functions via ingress translation
 	ps_pcie_dma_chann_desc_t aux_channels[PS_PCIE_NUM_DMA_CHANNELS]; //array of channel descriptors
 #endif
-    unsigned long dma_reg_phy_base_addr; //Physical Base address of the DMA registers
+    	u64 dma_reg_phy_base_addr; //Physical Base address of the DMA registers
 	u8 __iomem *dma_reg_virt_base_addr; //Virtual Base address of the DMA registers
-	unsigned long dma_chann_reg_phy_base_addr; //Physical Base address of the DMA Channel registers
+	u64 dma_chann_reg_phy_base_addr; //Physical Base address of the DMA Channel registers
 	u8 __iomem *dma_chann_reg_virt_base_addr; //Virtual Base address of the DMA Channel registers
 	spinlock_t dma_lock; //lock
 }ps_pcie_dma_desc_t;

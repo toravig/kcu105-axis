@@ -233,7 +233,7 @@ static int nwl_dma_is_chann_alloc_ep(ps_pcie_dma_desc_t * ptr_dma_desc,
  *
  *
  */
-static void InitBridge(u64 bar0_addr, u32 bar0_addr_p, u64 bar2_addr, u32 bar2_addr_p)
+static void InitBridge(u64 bar0_addr, u64 bar0_addr_p, u64 bar2_addr, u64 bar2_addr_p)
 {
   u32 reg;
 
@@ -245,16 +245,23 @@ static void InitBridge(u64 bar0_addr, u32 bar0_addr_p, u64 bar2_addr, u32 bar2_a
   printk("breg_src_base_lo = %0x\n", reg);
 
   /* program breg_src_base the same as what is accessible over PCIe */
-  XIo_Out32((bar0_addr +REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_SRC_LO ), (bar0_addr_p +REG_BRDG_BASE ));
+  XIo_Out32((bar0_addr +REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_SRC_LO ),(u32)(bar0_addr_p +REG_BRDG_BASE ));
   reg = XIo_In32(bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_SRC_LO);
   printk("breg_src_base_lo = %0x\n", reg);
-  
+  XIo_Out32((bar0_addr +REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_SRC_HI ),(u32)((bar0_addr_p +REG_BRDG_BASE ) >> 32));
+  reg = XIo_In32(bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_SRC_HI);
+  printk("breg_src_base_hi = %0x\n", reg);
 #if defined(PFORM_USCALE_NO_EP_PROCESSOR) || defined(DDR_DESIGN)
 /* Max Read and Write Request size on Master AXI-MM interface of DMA */
-  XIo_Out32((bar0_addr + REG_BRDG_BASE + CFG_AXI_MASTER),0x33);
+  XIo_Out32((bar0_addr + REG_BRDG_BASE + CFG_AXI_MASTER),MAX_RW_AXI_MM);
 /* Programming the FC credits;
  Completion Header Credits=0x60; Completion Data=0x3E0 */
   XIo_Out32((bar0_addr + REG_BRDG_BASE + CFG_PCIE_CREDIT),FC_COMP_HEADER_DATA);
+#endif
+#ifdef HW_SGL_DESIGN
+	/* Change AXI Read/Write request size
+	 - 0x22 - 256B for Read & Wr */
+XIo_Out32((bar0_addr + REG_BRDG_BASE + CFG_AXI_MASTER),MAX_RW_AXI_MM);
 #endif
   /* Currently setting up only one translation region - might need more as
    * future DUTs require */
@@ -265,20 +272,20 @@ static void InitBridge(u64 bar0_addr, u32 bar0_addr_p, u64 bar2_addr, u32 bar2_a
   /* Programming an aperture size of 1M(80000) ,Ingress Enable(00001) */
   XIo_Out32((bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_CTRL), (reg | 0x00080001));
   printk("tran_ingress_control = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_CTRL));
-  //- This translation mapas BAR[2] hits to AXI address 0x44A00000
-  //- Program src address to be BAR[2]
-  XIo_Out32((bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_SRC_LO), bar2_addr_p);
+  /*- This translation maps BAR[2] hits to AXI address 0x44A00000
+    - Program src address to be BAR[2] */
+  XIo_Out32((bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_SRC_LO), (u32)bar2_addr_p);
   printk("tran_src_lo = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_SRC_LO));
-  //- Program DST address to be AXI domain address for user reg module
+  XIo_Out32((bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_SRC_HI), (u32)((bar2_addr_p)>> 32));
+  printk("tran_src_hi = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_SRC_HI));
+  /*- Program DST address to be AXI domain address for user reg module */
   XIo_Out32((bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_DST_LO),AXI_DOMAIN_ADDR);
   printk("tran_dst_lo = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_DST_LO));
-#ifdef HW_SGL_DESIGN
-	// Change AXI Read/Write request size
-	////- 0x22 - 256B for Read & Wr
-XIo_Out32((bar0_addr + REG_BRDG_BASE + CFG_AXI_MASTER),0x22);
-#endif
 
-  reg = XIo_In32(bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_CTRL );
+/* DST HI will already set to Zero by default */
+//  XIo_Out32((bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_DST_HI),0x00000000);
+//  printk("tran_dst_hi = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_DST_HI));
+
 
 #if defined(VIDEO_ACC_DESIGN)
   /* Adding DREG capability */
@@ -294,29 +301,27 @@ XIo_Out32((bar0_addr + REG_BRDG_BASE + CFG_AXI_MASTER),0x22);
   XIo_Out32(bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_D_CTRL,reg );
   printk("\nData at BAR0 offset (0x8288) = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE  + REG_BRDG_E_BASE + OFFSET_BRDG_D_CTRL ));
 
-  //- Program src address to be BAR[2]
+  /* - Program src address to be BAR[2] */
   XIo_Out32((bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_D_SRC_LO), 0x80000000);
   printk("\nData at BAR0 offset (0x8290) = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE  + REG_BRDG_E_BASE + OFFSET_BRDG_D_SRC_LO ));
-  XIo_Out32((bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_D_SRC_HI), 0);
 
-  /* Enable interrupts */
-  //reg = XIo_In32(bar0_addr + REG_BRDG_BASE +0x464);//  RD_DMA_REG(brdg_reg_base, EP_BRDG_REG_MSGF_MSK_OFFSET);
-  //reg = 0x01;//EP_BRDG_MSGFDMAMSK_INTREN_BIT;
   XIo_Out32((bar0_addr + REG_BRDG_BASE + 0x464), 1);
   reg = XIo_In32(bar0_addr + REG_BRDG_BASE +0x464);//  RD_DMA_REG(brdg_reg_base, EP_BRDG_REG_MSGF_MSK_OFFSET);
   printk(KERN_ERR"EP_BRDG_REG_MSGF_MSK_OFFSET = %x\n",reg);
   
-  reg = XIo_In32(bar0_addr + 0x68);
+  reg = XIo_In32(bar0_addr + DMA_AXI_INTR_CNTRL_REG_OFFSET );
   printk(KERN_ERR"AXI_INTERRUPT_CTRL register val = %x\n",reg);
+  /* Enable AXI Interrupts */
   reg |= 0x01;
-  XIo_Out32(bar0_addr + 0x68,reg);
+  XIo_Out32(bar0_addr + DMA_AXI_INTR_CNTRL_REG_OFFSET,reg);
   printk(KERN_ERR"AXI_INTERRUPT_CTRL register val = %x\n",reg);
 
-//  XIo_Out32((bar0_addr + 0x74), 0x8);
+//  XIo_Out32((bar0_addr + DMA_AXI_INTR_ASSRT_REG_OFFSET), 0x8);
 #endif
 
-  //- Enable bridge translation with 64K size
-  printk("e_breg_control= %0x\n", reg);
+  reg = XIo_In32(bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_CTRL );
+  /* Enable bridge translation with 64K size */
+  printk("Initial e_breg_control= %0x\n", reg);
   XIo_Out32((bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_CTRL), 0x00040001);
    reg = XIo_In32(bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_CTRL );
   printk("e_breg_control= %0x\n", reg);
@@ -325,22 +330,22 @@ XIo_Out32((bar0_addr + REG_BRDG_BASE + CFG_AXI_MASTER),0x22);
 XIo_Out32((bar2_addr + USER_BASE + SCAL_FACTOR_REG), 0x1);
 #endif
 #if 1
-
-printk("Scaling factor %x",XIo_In32(bar2_addr + 0x1008));
 printk("Scaling factor %x",XIo_In32(bar2_addr + USER_BASE + SCAL_FACTOR_REG));
 #ifdef DDR_DESIGN
-// For x8 Gen3, MIG AXI User Clk is 300MHz
+/* For x8 Gen3, MIG AXI User Clk is 300MHz */
 XIo_Out32((bar2_addr + USER_BASE + CLK_PERIOD_REG), CLK_250MHZ_PERIOD);            //250MHz clock
 XIo_Out32((bar2_addr + AXI_PERF_MON_BASE + SAMPLE_INTERVAL), CLK_300MHZ_PERIOD);   //300MHz clock
-// For x4 Gen3, PCIe User clk is 125MHz and MIG AXI User Clk is 267MHz
+/* For x4 Gen3, PCIe User clk is 125MHz and MIG AXI User Clk is 267MHz */
 //XIo_Out32((bar2_addr + USER_BASE + CLK_PERIOD_REG), CLK_125MHZ_PERIOD);            //125MHz clock
 //XIo_Out32((bar2_addr + AXI_PERF_MON_BASE + SAMPLE_INTERVAL), CLK_267MHZ_PERIOD);   //267MHz clock
 #else
 XIo_Out32((bar2_addr + AXI_PERF_MON_BASE + SAMPLE_INTERVAL), CLK_250MHZ_PERIOD); // 250 MHz
 #endif 
+
  XIo_Out32((bar2_addr + AXI_PERF_MON_BASE + SAMPLE_INTERVAL_CTRL), 0x2); // Load inteval timer reg value
  XIo_Out32((bar2_addr + AXI_PERF_MON_BASE + SAMPLE_INTERVAL_CTRL), 0x0); // clear load bit
  XIo_Out32((bar2_addr + AXI_PERF_MON_BASE + SAMPLE_INTERVAL_CTRL), 0x101); // enable + reset metric counter after read
+
 #ifdef HW_SGL_DESIGN
 #ifdef ETH_APP
  XIo_Out32((bar2_addr +  AXI_PERF_MON_BASE + METRIC_SEL_REG0), 0x52721232);//slotID1-databytecount + slotID0 databytecount
@@ -348,7 +353,6 @@ XIo_Out32((bar2_addr + AXI_PERF_MON_BASE + SAMPLE_INTERVAL), CLK_250MHZ_PERIOD);
 #else
 XIo_Out32((bar2_addr +  AXI_PERF_MON_BASE + METRIC_SEL_REG0), 0x1232);//slotID1-databytecount + slotID0 databytecount
 #endif
-
 #endif
 
 #ifdef PFORM_USCALE_NO_EP_PROCESSOR
@@ -398,7 +402,7 @@ static void poll_stats(unsigned long __opaque)
     //    printk(KERN_ERR"LTX = %d LRX = %d RBC_APM = %d WBC_APM = %d\n",TStats[tstatsWrite].LTX,\
       //                 TStats[tstatsWrite].LRX, TStats[tstatsWrite].RBC_APM0, TStats[tstatsWrite].WBC_APM0);
 #elif defined(ETH_APP)
-TStats[tstatsWrite].RBC_APM0 = RD_DMA_REG(base,  AXI_PERF_MON_BASE + APM_METRIC_CNTR0);
+	TStats[tstatsWrite].RBC_APM0 = RD_DMA_REG(base,  AXI_PERF_MON_BASE + APM_METRIC_CNTR0);
 	TStats[tstatsWrite].WBC_APM0 = RD_DMA_REG(base, AXI_PERF_MON_BASE + APM_METRIC_CNTR1 );
 	TStats[tstatsWrite].RBC_APM1 = RD_DMA_REG(base, AXI_PERF_MON_BASE + APM_METRIC_CNTR2 );
 	TStats[tstatsWrite].WBC_APM1 = RD_DMA_REG(base, AXI_PERF_MON_BASE + APM_METRIC_CNTR3 );
@@ -407,6 +411,7 @@ printk("## RBC0 %x WBC0 %x RBC1 %x wbc1 %x ## \n",TStats[tstatsWrite].RBC_APM0,T
 	TStats[tstatsWrite].RBC_APM0 = RD_DMA_REG(base,  AXI_PERF_MON_BASE + APM_METRIC_CNTR0);
 	TStats[tstatsWrite].WBC_APM0 = RD_DMA_REG(base, AXI_PERF_MON_BASE + APM_METRIC_CNTR1 );
 #endif
+/* Check for DATA_VERIFY for Checker mode */
 #ifndef DDR_DESIGN
 //	val = RD_DMA_REG(base,GEN_CHECK_OFFSET_START + CHK_STATUS);
 //         if(val)
@@ -618,13 +623,14 @@ static long xdma_dev_ioctl(struct file * filp,
         break;
 	case IGET_LED_STATISTICS:
 #ifdef ETH_APP
-        Status_Reg = XIo_In32(base + 0x00001418);
+        Status_Reg = XIo_In32(base +USER_BASE + 0x418);
 
-	lstats.Phy0 = (Status_Reg && 0x000000FF) & 0x1; /* 30th bit 'on' of Status Register indicated Phy 0 link up */
+	lstats.Phy0 = (Status_Reg && 0x000000FF) & 0x1;  /* 30th bit 'on' of Status Register indicated Phy 0 link up */
 	lstats.Phy1 = (Status_Reg && 0x0000FF00) & 0x1;  /* 31st bit 'on' of Status Register indicated Phy 1 link up */
 #endif
 #ifdef DDR_DESIGN
-	lstats.DdrCalib0 = 0x1;/* 1st bit 'on' of Status Register indicated DDR3 Calibration done*/
+        Status_Reg = XIo_In32(base + USER_BASE + 0x4);	
+	lstats.DdrCalib0 = (Status_Reg) & 0x1  /* 1st bit 'on' of Status Register indicated DDR3 Calibration done*/
 #endif 
         if(copy_to_user((LedStats *)arg, &lstats, sizeof(LedStats)))
         {
@@ -695,156 +701,7 @@ static long xdma_dev_ioctl(struct file * filp,
             break;
         }
         break;
-#if 0
-
-    case IGET_DMA_STATISTICS:
-        if(copy_from_user(&es, (EngStatsArray *)arg, sizeof(EngStatsArray)))
-        {
-            printk("copy_from_user failed\n");
-            retval = -1;
-            break;
-        }
-
-        ds = es.engptr;
-        len = 0;
-        for(i=0; i<es.Count; i++)
-        {
-            DMAStatistics from;
-            int j;
-
-            /* Must copy in a round-robin manner so that reporting is fair */
-            for(j=0; j<MAX_DMA_ENGINES; j++)
-            {
-                if(!dstatsNum[j]) continue;
-
-                spin_lock_bh(&DmaStatsLock);
-                from = DStats[j][dstatsRead[j]];
-                from.Engine = j;
-                dstatsNum[j] -= 1;
-                dstatsRead[j] += 1;
-                if(dstatsRead[j] == MAX_STATS)
-                    dstatsRead[j] = 0;
-                spin_unlock_bh(&DmaStatsLock);
-
-                if(copy_to_user(ds, &from, sizeof(DMAStatistics)))
-                {
-                    printk("copy_to_user failed\n");
-                    retval = -EFAULT;
-                    break;
-                }
-
-                len++;
-                i++;
-                if(i >= es.Count) break;
-                ds++;
-            }
-            if(retval < 0) break;
-        }
-        es.Count = len;
-        if(copy_to_user((EngStatsArray *)arg, &es, sizeof(EngStatsArray)))
-        {
-            printk("copy_to_user failed\n");
-            retval = -EFAULT;
-            break;
-        }
-        break;
-
-    case IGET_TRN_STATISTICS:
-        if(copy_from_user(&tsa, (TRNStatsArray *)arg, sizeof(TRNStatsArray)))
-        {
-            printk("copy_from_user failed\n");
-            retval = -1;
-            break;
-        }
-
-        ts = tsa.trnptr;
-        len = 0;
-        for(i=0; i<tsa.Count; i++)
-        {
-            TRNStatistics from;
-
-            if(!tstatsNum) break;
-
-            spin_lock_bh(&DmaStatsLock);
-            from = TStats[tstatsRead];
-            tstatsNum -= 1;
-            tstatsRead += 1;
-            if(tstatsRead == MAX_STATS)
-                tstatsRead = 0;
-            spin_unlock_bh(&DmaStatsLock);
-
-            if(copy_to_user(ts, &from, sizeof(TRNStatistics)))
-            {
-                printk("copy_to_user failed\n");
-                retval = -EFAULT;
-                break;
-            }
-
-            len++;
-            ts++;
-        }
-        tsa.Count = len;
-        if(copy_to_user((TRNStatsArray *)arg, &tsa, sizeof(TRNStatsArray)))
-        {
-            printk("copy_to_user failed\n");
-            retval = -EFAULT;
-            break;
-        }
-        break;
-
-    case IGET_SW_STATISTICS:
-        if(copy_from_user(&ssa, (SWStatsArray *)arg, sizeof(SWStatsArray)))
-        {
-            printk("copy_from_user failed\n");
-            retval = -1;
-            break;
-        }
-
-        ss = ssa.swptr;
-        len = 0;
-        for(i=0; i<ssa.Count; i++)
-        {
-            SWStatistics from;
-            int j;
-
-            /* Must copy in a round-robin manner so that reporting is fair */
-            for(j=0; j<MAX_DMA_ENGINES; j++)
-            {
-                if(!sstatsNum[j]) continue;
-
-                spin_lock_bh(&DmaStatsLock);
-                from = SStats[j][sstatsRead[j]];
-                from.Engine = j;
-                sstatsNum[j] -= 1;
-                sstatsRead[j] += 1;
-                if(sstatsRead[j] == MAX_STATS)
-                    sstatsRead[j] = 0;
-                spin_unlock_bh(&DmaStatsLock);
-
-                if(copy_to_user(ss, &from, sizeof(SWStatistics)))
-                {
-                    printk("copy_to_user failed\n");
-                    retval = -EFAULT;
-                    break;
-                }
-
-                len++;
-                i++;
-                if(i >= ssa.Count) break;
-                ss++;
-            }
-            if(retval < 0) break;
-        }
-        ssa.Count = len;
-        if(copy_to_user((SWStatsArray *)arg, &ssa, sizeof(SWStatsArray)))
-        {
-            printk("copy_to_user failed\n");
-            retval = -EFAULT;
-            break;
-        }
-        break;
-#endif
-	case IGET_TRN_STATISTICS:
+case IGET_TRN_STATISTICS:
 		   if(copy_from_user(&tsa, (TRNStatsArray *)arg, sizeof(TRNStatsArray)))
 		   {
 			   printk("copy_from_user failed\n");
@@ -970,9 +827,8 @@ static int /*__devinit*/ nwl_dma_probe(struct pci_dev *pdev,
     
 	spin_lock_init(&ptr_dma_desc_temp->dma_lock);
 
-#if 1
         spin_lock_init(&DmaStatsLock);
-#endif
+
 	ptr_dma_desc_temp->dma_reg_phy_base_addr = pci_resource_start(pdev, PS_PCIE_BRDG_DMA_CHANN_BAR);
 	ptr_dma_desc_temp->dma_reg_virt_base_addr = ioremap_nocache(ptr_dma_desc_temp->dma_reg_phy_base_addr, 
 																pci_resource_len(pdev, 0));
@@ -984,15 +840,13 @@ static int /*__devinit*/ nwl_dma_probe(struct pci_dev *pdev,
 			goto err_ioremap;
 	}
 
-	printk(KERN_ERR"\nPhysical addr: %x, Virt address %p Length %d\n",(unsigned int)ptr_dma_desc_temp->dma_reg_phy_base_addr, 
+	printk(KERN_ERR"\n DMA and Bridge Register Base Physical addr: %x, Virt address %p Length %d\n",(unsigned int)ptr_dma_desc_temp->dma_reg_phy_base_addr, 
 		   ptr_dma_desc_temp->dma_reg_virt_base_addr, (int)pci_resource_len(pdev, 0));
 
 	/* Assign the channel register base address */
 	ptr_dma_desc_temp->dma_chann_reg_virt_base_addr = ptr_dma_desc_temp->dma_reg_virt_base_addr /*+ 0x1000*/;
 
-	printk(KERN_ERR"\nChannel base addr reg %p\n", ptr_dma_desc_temp->dma_chann_reg_virt_base_addr);
-
-#if defined(PFORM_USCALE_NO_EP_PROCESSOR) || defined(HW_SGL_DESIGN) || defined(DDR_DESIGN)
+	
 	ptr_dma_desc_temp->cntrl_func_phy_base_addr = pci_resource_start(pdev, PS_PCIE_CNTRL_FUNCT_INGRESS_TRANS_BAR);
 	ptr_dma_desc_temp->cntrl_func_virt_base_addr = ioremap_nocache(ptr_dma_desc_temp->cntrl_func_phy_base_addr, 
 																   pci_resource_len(pdev, PS_PCIE_CNTRL_FUNCT_INGRESS_TRANS_BAR));
@@ -1004,18 +858,17 @@ static int /*__devinit*/ nwl_dma_probe(struct pci_dev *pdev,
 			goto err_ioremap_ingress_bar;
 	}
 
-	printk(KERN_ERR"\nPhysical addr: %x, Virt address %p Length %d\n",(unsigned int)ptr_dma_desc_temp->cntrl_func_phy_base_addr, 
+	printk(KERN_ERR"\n User Registers BAR Physical addr: %x, Virt address %p Length %d\n",(unsigned int)ptr_dma_desc_temp->cntrl_func_phy_base_addr, 
 		   ptr_dma_desc_temp->cntrl_func_virt_base_addr, (int)pci_resource_len(pdev, PS_PCIE_CNTRL_FUNCT_INGRESS_TRANS_BAR));
 
 	/* Initialize the bridge */
 	InitBridge((u64) ptr_dma_desc_temp->dma_reg_virt_base_addr, 
-			   (u32) ptr_dma_desc_temp->dma_reg_phy_base_addr, 
+			   (u64) ptr_dma_desc_temp->dma_reg_phy_base_addr, 
 			   (u64) ptr_dma_desc_temp->cntrl_func_virt_base_addr, 
-			   (u32) ptr_dma_desc_temp->cntrl_func_phy_base_addr);
+			   (u64) ptr_dma_desc_temp->cntrl_func_phy_base_addr);
 
   pci_set_drvdata(pdev, ptr_dma_desc_temp);
 
-#endif
 
 #ifdef USE_MSIX
 	{
@@ -1093,7 +946,6 @@ static int /*__devinit*/ nwl_dma_probe(struct pci_dev *pdev,
 		goto interrupt_registration_failed;
 	}
 #endif
-#if 1
  /* The following code is for registering as a character device driver.
      * The GUI will use /dev/xdma_state file to read state & statistics.
      * Incase of any failure, the driver will come up without device
@@ -1134,13 +986,6 @@ static int /*__devinit*/ nwl_dma_probe(struct pci_dev *pdev,
             }
         }
     }
-
-
-
-#endif
-
-
-	
                 /* Initialise all stats pointers */
                 for(i=0; i<PS_PCIE_NUM_DMA_CHANNELS; i++)
                 {
@@ -1241,10 +1086,7 @@ unregister_chrdev_region(xdmaCdev->dev,1);
 #endif
 
 
-#ifdef PFORM_USCALE_NO_EP_PROCESSOR
 	iounmap(g_host_dma_desc.cntrl_func_virt_base_addr); //Todo need to change for multiple card support with linked list
-#endif
-
 	iounmap(g_host_dma_desc.dma_reg_virt_base_addr); //Todo need to change for multiple card support with linked list
 	pci_clear_master(pdev);
 	pci_release_regions(pdev);
