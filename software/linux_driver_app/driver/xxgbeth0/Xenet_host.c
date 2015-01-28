@@ -308,30 +308,37 @@ static int xenet_send(struct sk_buff *skb, struct net_device *dev)
 	unsigned int len;
 	//glb_buf[chann->chann_id] = skb->data;
 
+	 //  spin_lock_bh(&lp->ptr_dma_chan_tx->channel_lock);
+	 //  spin_lock(&lp->ptr_dma_chan_tx->channel_lock);
+	   spin_lock_irqsave(&lp->ptr_dma_chan_tx->channel_lock,flags);
 	   nfrags = skb_shinfo(skb)->nr_frags +1;
 	   if(nfrags > (free_num_q_elements - 1))
 	     {
 		netif_stop_queue(dev);
 		printk("######STOP ETH0#######\n");
+//		spin_unlock_bh(&lp->ptr_dma_chan_tx->channel_lock);
+		spin_unlock_irqrestore(&lp->ptr_dma_chan_tx->channel_lock, flags);
 		return NETDEV_TX_BUSY;
 		}
            if(nfrags == 1)
            	{
                 //printk(KERN_ERR "Number of frags is %d :: size %d \n",nfrags,skb->len);
-		spin_lock_bh(&lp->ptr_dma_chan_tx->channel_lock);
+//		spin_lock_bh(&lp->ptr_dma_chan_tx->channel_lock);
 		retval = xlnx_data_frag_io(lp->ptr_dma_chan_tx, skb->data,  VIRT_ADDR, 
 									   skb->len,cbk_data_pump ,/*num_pkts+1*/1, true, /*OUT,*/(void *) skb);
 			if(retval < XLNX_SUCCESS) 
 			{
 			       printk(KERN_ERR"\n Context Q saturated %d\n");
 			}
-			spin_unlock_bh(&lp->ptr_dma_chan_tx->channel_lock);
+//			spin_unlock_bh(&lp->ptr_dma_chan_tx->channel_lock);
 		
            	}
 		else 
 		{
                          int i=0; 
 //			 printk(KERN_ERR"##### Eth0 Frags %d #####\n",nfrags);			  
+
+		//	 spin_lock_bh(&lp->ptr_dma_chan_tx->channel_lock);
 		         frag = &skb_shinfo(skb)->frags[0];
 	                  for(i=0;i< nfrags;i++)
 	                  	{
@@ -344,14 +351,14 @@ static int xenet_send(struct sk_buff *skb, struct net_device *dev)
 					   printk(KERN_ERR"\n########################################\n");
 #endif			
      				      //     printk(KERN_ERR "Number of frags is %d :: size %d \n",nfrags,skb->len);
-						spin_lock_bh(&lp->ptr_dma_chan_tx->channel_lock);
+				//		spin_lock_bh(&lp->ptr_dma_chan_tx->channel_lock);
 						retval = xlnx_data_frag_io(lp->ptr_dma_chan_tx, skb->data,  VIRT_ADDR, 
 									   len,cbk_data_pump ,/*num_pkts+1*/1, false, /*OUT,*/(void *) skb);
 					if(retval < XLNX_SUCCESS) 
 					{
 			       			printk(KERN_ERR"\n Context Q saturated Eth0\n");
 					}
-						spin_unlock_bh(&lp->ptr_dma_chan_tx->channel_lock);
+				//		spin_unlock_bh(&lp->ptr_dma_chan_tx->channel_lock);
 		
            				}
 
@@ -375,7 +382,7 @@ static int xenet_send(struct sk_buff *skb, struct net_device *dev)
 					   printk(KERN_ERR"Eth0 Frag %d Length %d Data %x %x %x %x %x %x %x %x ",i,len,*((int *)(virt_addr)),*((int *)(virt_addr)+ 1),*((int *)(virt_addr)+ 2),*((int *)(virt_addr)+ 3),*((int *)(virt_addr)+4),*((int *)(virt_addr)+5 ),*((int *)(virt_addr)+6),*((int *)(virt_addr)+7 ));
 					   printk(KERN_ERR"\n########################################\n");
 #endif
-                                       spin_lock_bh(&lp->ptr_dma_chan_tx->channel_lock);
+                                      // spin_lock_bh(&lp->ptr_dma_chan_tx->channel_lock);
 
 					if(i== nfrags-1)
 					{
@@ -390,11 +397,13 @@ static int xenet_send(struct sk_buff *skb, struct net_device *dev)
 			      			 printk(KERN_ERR"\n Context Q saturated Eth0\n");
 			       
 						}
-					spin_unlock_bh(&lp->ptr_dma_chan_tx->channel_lock);					   
+			//		spin_unlock_bh(&lp->ptr_dma_chan_tx->channel_lock);					   
 					frag++	;				
 		                        	}
 			
 	                  	}
+
+		//	spin_unlock_bh(&lp->ptr_dma_chan_tx->channel_lock);					   
 
 			
 			}
@@ -405,7 +414,10 @@ static int xenet_send(struct sk_buff *skb, struct net_device *dev)
 //	printk(KERN_ERR"\n --> Thread Pumping data\n");
 	
 
+			//spin_unlock_bh(&lp->ptr_dma_chan_tx->channel_lock);					   
+		//	spin_unlock(&lp->ptr_dma_chan_tx->channel_lock);					   
 
+		spin_unlock_irqrestore(&lp->ptr_dma_chan_tx->channel_lock, flags);
     return 0;
 }
 
