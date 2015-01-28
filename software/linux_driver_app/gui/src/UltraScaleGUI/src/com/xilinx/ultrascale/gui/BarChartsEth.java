@@ -97,9 +97,10 @@ public class BarChartsEth {
         caxis.setLabelPaint(new Color(0, 0, 0));
 
         renderer.setItemMargin(0);
-        renderer.setSeriesPaint(0, new Color(0, 0, 0x80));
-        renderer.setSeriesPaint(1, new Color(0, 0x80, 0xff));
-        renderer.setSeriesPaint(2, new Color(0xa2, 0x45, 0x73));
+        renderer.setSeriesPaint(0, new Color(0x2e, 0x90, 0x18));//(0x17, 0x7b, 0x7c));
+        renderer.setSeriesPaint(1, new Color(0x12, 0x45, 0x73));//(0xa2, 0x45, 0x73)
+        renderer.setSeriesPaint(2, new Color(0xff, 0x80, 0x40));
+        renderer.setSeriesPaint(3, new Color(0x6f, 0x2c, 0x85)); 
 //        renderer.setBaseToolTipGenerator(new StandardCategoryToolTipGenerator("{0}:{2}", new DecimalFormat("0.000")));
         //renderer.setMaximumBarWidth(0.05);
         addDummy();
