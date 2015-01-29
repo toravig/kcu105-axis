@@ -7,6 +7,7 @@ import javax.swing.*;
 import java.io.*;
 import java.awt.Dialog.ModalityType;
 import java.awt.*;
+import java.rmi.AlreadyBoundException;
 import javax.swing.JOptionPane;
 /*
  * To change this template, choose Tools | Templates
@@ -50,6 +51,23 @@ public class LandingPage extends javax.swing.JFrame {
                 EthernetRadioButton.setEnabled(false);
                 ControlPlaneRadioButton.setSelected(false);
                 ControlPlaneRadioButton.setEnabled(false);
+
+                AcceleratorRadioButton.setSelected(false);
+                AcceleratorRadioButton.setEnabled(false);
+
+            } else if (res.length() > 2 && (res.contains("8183"))) {
+                acceleratorRadioButton.setSelected(true);
+                acceleratorRadioButton.setEnabled(true);
+                EthernetRadioButton.setSelected(false);
+                EthernetRadioButton.setEnabled(false);
+                ControlPlaneRadioButton.setSelected(false);
+                ControlPlaneRadioButton.setEnabled(false);
+
+                PerformanceRadioButton.setSelected(false);
+                DDRgenchkRadioButton.setSelected(false);
+                PerformanceRadioButton.setEnabled(false);
+                DDRgenchkRadioButton.setEnabled(false);
+                AcceleratorRadioButton.setSelected(true);
             } else if (res.length() > 2 && res.contains("8082")) {
                 acceleratorRadioButton.setSelected(false);
                 acceleratorRadioButton.setEnabled(false);
@@ -57,6 +75,28 @@ public class LandingPage extends javax.swing.JFrame {
                 EthernetRadioButton.setEnabled(true);
                 ControlPlaneRadioButton.setSelected(false);
                 ControlPlaneRadioButton.setEnabled(false);
+
+                perfGenChkRadioButton.setEnabled(true);
+                perfGenChkRadioButton.setSelected(true);
+
+                perfRawRadioButton.setSelected(false);
+                perfRawRadioButton.setEnabled(false);
+
+                PerfAppRadioButton.setEnabled(false);
+
+            } else if (res.length() > 2 && res.contains("8182")) {
+                acceleratorRadioButton.setSelected(false);
+                acceleratorRadioButton.setEnabled(false);
+                EthernetRadioButton.setSelected(true);
+                EthernetRadioButton.setEnabled(true);
+                ControlPlaneRadioButton.setSelected(false);
+                ControlPlaneRadioButton.setEnabled(false);
+
+                perfGenChkRadioButton.setEnabled(false);
+                perfGenChkRadioButton.setSelected(false);
+
+                perfRawRadioButton.setSelected(true);
+
             } else if (res.length() > 2 && res.contains("8011")) {
                 acceleratorRadioButton.setSelected(false);
                 acceleratorRadioButton.setEnabled(false);
@@ -82,7 +122,7 @@ public class LandingPage extends javax.swing.JFrame {
                 // Display control plane.
             } else {
                 ControlInstallButton.setEnabled(false);
-                if (res.length() > 2 && (res.contains("8083") || res.contains("8082") || res.contains("8043") || res.contains("8042"))) {
+                if (res.length() > 2 && (res.contains("8083") || res.contains("8183") || res.contains("8082") || res.contains("8182") || res.contains("8043") || res.contains("8042"))) {
                     jLabel3.setText(res.substring(res.indexOf(" ") + 1, res.length()));
 
                 } else {
@@ -134,13 +174,13 @@ public class LandingPage extends javax.swing.JFrame {
         HeaderPanel = new javax.swing.JPanel();
         jLabel1 = new javax.swing.JLabel();
         DeviceStatusPanel = new javax.swing.JPanel();
-        jLabel2 = new javax.swing.JLabel();
-        jLabel3 = new javax.swing.JLabel();
         SelectionPanel = new javax.swing.JPanel();
         acceleratorRadioButton = new javax.swing.JRadioButton();
         EthernetRadioButton = new javax.swing.JRadioButton();
         ControlPlaneRadioButton = new javax.swing.JRadioButton();
         ControlMainPanel = new javax.swing.JPanel();
+        jLabel3 = new javax.swing.JLabel();
+        jLabel2 = new javax.swing.JLabel();
 
         PCIeBasedAccPanel.setBorder(javax.swing.BorderFactory.createEtchedBorder());
 
@@ -296,7 +336,7 @@ public class LandingPage extends javax.swing.JFrame {
                         .addGroup(PerformanceEthPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(perfGenChkRadioButton)
                             .addComponent(perfRawRadioButton))))
-                .addContainerGap(81, Short.MAX_VALUE))
+                .addContainerGap(83, Short.MAX_VALUE))
         );
         PerformanceEthPanelLayout.setVerticalGroup(
             PerformanceEthPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -307,7 +347,7 @@ public class LandingPage extends javax.swing.JFrame {
                 .addComponent(perfGenChkRadioButton)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(perfRawRadioButton)
-                .addContainerGap(28, Short.MAX_VALUE))
+                .addContainerGap(22, Short.MAX_VALUE))
         );
 
         ApplicationEthPanel.setBorder(javax.swing.BorderFactory.createEtchedBorder());
@@ -505,31 +545,15 @@ public class LandingPage extends javax.swing.JFrame {
             .addComponent(jLabel1, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, 34, Short.MAX_VALUE)
         );
 
-        jLabel2.setFont(new java.awt.Font("Tahoma", 1, 12)); // NOI18N
-        jLabel2.setText("Device:");
-
-        jLabel3.setText("Communication controller: Xilinx Corporation Device 7082");
-
         javax.swing.GroupLayout DeviceStatusPanelLayout = new javax.swing.GroupLayout(DeviceStatusPanel);
         DeviceStatusPanel.setLayout(DeviceStatusPanelLayout);
         DeviceStatusPanelLayout.setHorizontalGroup(
             DeviceStatusPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(DeviceStatusPanelLayout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(DeviceStatusPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(DeviceStatusPanelLayout.createSequentialGroup()
-                        .addComponent(jLabel2, javax.swing.GroupLayout.PREFERRED_SIZE, 88, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(0, 0, Short.MAX_VALUE))
-                    .addComponent(jLabel3, javax.swing.GroupLayout.DEFAULT_SIZE, 597, Short.MAX_VALUE))
-                .addContainerGap())
+            .addGap(0, 621, Short.MAX_VALUE)
         );
         DeviceStatusPanelLayout.setVerticalGroup(
             DeviceStatusPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(DeviceStatusPanelLayout.createSequentialGroup()
-                .addComponent(jLabel2, javax.swing.GroupLayout.PREFERRED_SIZE, 19, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jLabel3, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addGap(16, 16, 16))
+            .addGap(0, 62, Short.MAX_VALUE)
         );
 
         SelectionPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("Design Selection"));
@@ -561,13 +585,13 @@ public class LandingPage extends javax.swing.JFrame {
         SelectionPanelLayout.setHorizontalGroup(
             SelectionPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(SelectionPanelLayout.createSequentialGroup()
-                .addContainerGap(23, Short.MAX_VALUE)
+                .addContainerGap(26, Short.MAX_VALUE)
                 .addComponent(acceleratorRadioButton, javax.swing.GroupLayout.PREFERRED_SIZE, 207, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(EthernetRadioButton, javax.swing.GroupLayout.PREFERRED_SIZE, 200, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 30, Short.MAX_VALUE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 32, Short.MAX_VALUE)
                 .addComponent(ControlPlaneRadioButton)
-                .addContainerGap(24, Short.MAX_VALUE))
+                .addContainerGap(26, Short.MAX_VALUE))
         );
         SelectionPanelLayout.setVerticalGroup(
             SelectionPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -580,7 +604,7 @@ public class LandingPage extends javax.swing.JFrame {
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
-        ControlMainPanel.setBorder(javax.swing.BorderFactory.createEtchedBorder());
+        ControlMainPanel.setBorder(null);
 
         javax.swing.GroupLayout ControlMainPanelLayout = new javax.swing.GroupLayout(ControlMainPanel);
         ControlMainPanel.setLayout(ControlMainPanelLayout);
@@ -590,19 +614,31 @@ public class LandingPage extends javax.swing.JFrame {
         );
         ControlMainPanelLayout.setVerticalGroup(
             ControlMainPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 146, Short.MAX_VALUE)
+            .addGap(0, 162, Short.MAX_VALUE)
         );
+
+        jLabel3.setText("Communication controller: Xilinx Corporation Device 7082");
+
+        jLabel2.setFont(new java.awt.Font("Tahoma", 1, 12)); // NOI18N
+        jLabel2.setText("Device:");
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(layout.createSequentialGroup()
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
                 .addContainerGap()
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
                     .addComponent(ControlMainPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(SelectionPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(HeaderPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                    .addGroup(javax.swing.GroupLayout.Alignment.LEADING, layout.createSequentialGroup()
+                        .addGap(12, 12, 12)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addGroup(layout.createSequentialGroup()
+                                .addComponent(jLabel2, javax.swing.GroupLayout.PREFERRED_SIZE, 88, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addGap(0, 0, Short.MAX_VALUE))
+                            .addComponent(jLabel3, javax.swing.GroupLayout.DEFAULT_SIZE, 609, Short.MAX_VALUE)))
+                    .addComponent(SelectionPanel, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(HeaderPanel, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                 .addContainerGap())
             .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                 .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
@@ -615,16 +651,20 @@ public class LandingPage extends javax.swing.JFrame {
             .addGroup(layout.createSequentialGroup()
                 .addContainerGap()
                 .addComponent(HeaderPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(67, 67, 67)
+                .addGap(3, 3, 3)
+                .addComponent(jLabel2, javax.swing.GroupLayout.PREFERRED_SIZE, 19, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(jLabel3, javax.swing.GroupLayout.DEFAULT_SIZE, 40, Short.MAX_VALUE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(SelectionPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(ControlMainPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addComponent(ControlMainPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addContainerGap())
             .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                 .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
-                    .addContainerGap(67, Short.MAX_VALUE)
+                    .addContainerGap(78, Short.MAX_VALUE)
                     .addComponent(DeviceStatusPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addContainerGap(232, Short.MAX_VALUE)))
+                    .addContainerGap(241, Short.MAX_VALUE)))
         );
 
         pack();
@@ -766,9 +806,9 @@ public class LandingPage extends javax.swing.JFrame {
         peertopeerCheckBox.setSelected(false);
         peertopeerCheckBox.setEnabled(false);
         perfRawRadioButton.setEnabled(true);
-        perfRawRadioButton.setSelected(false);
-        perfGenChkRadioButton.setEnabled(true);
-        perfGenChkRadioButton.setSelected(true);
+        perfRawRadioButton.setSelected(true);
+        perfGenChkRadioButton.setEnabled(false);
+        perfGenChkRadioButton.setSelected(false);
     }//GEN-LAST:event_PerfEthRadioButtonActionPerformed
 
     private void perfGenChkRadioButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_perfGenChkRadioButtonActionPerformed
@@ -822,6 +862,26 @@ public class LandingPage extends javax.swing.JFrame {
         /* Create and display the form */
         java.awt.EventQueue.invokeLater(new Runnable() {
             public void run() {
+                // check for instance running
+                RmiManager rmiManager = new RmiManager();
+                rmiManager.createRmiRegistry();
+
+                if (rmiManager.isAlreadyRunning()) {
+                    Object[] options1 = {"Ok"};
+                    int s = JOptionPane.showOptionDialog(null, "Another instance of GUI is running.", " ",
+                            JOptionPane.CLOSED_OPTION, JOptionPane.WARNING_MESSAGE,
+                            null, options1, null);
+
+                    System.exit(0);
+                    return;
+                }
+
+                try {
+                    rmiManager.registerApplication();
+                } catch (AlreadyBoundException ex) {
+                }
+
+                /// no other instance is running
                 lander = new LandingPage();
                 lander.setVisible(true);
                 lander.setSizesOfDynamicPanels();
@@ -834,9 +894,9 @@ public class LandingPage extends javax.swing.JFrame {
     }
 
     public void setSizesOfDynamicPanels() {
-        EthernetPanel.setSize(ControlMainPanel.getSize());
-        PCIeBasedAccPanel.setSize(ControlMainPanel.getSize());
-        ControlPlanePanel.setSize(ControlMainPanel.getSize());
+        EthernetPanel.setSize(ControlMainPanel.getSize().width - 10, ControlMainPanel.getSize().height);
+        PCIeBasedAccPanel.setSize(ControlMainPanel.getSize().width - 10, ControlMainPanel.getSize().height);
+        ControlPlanePanel.setSize(ControlMainPanel.getSize().width - 10, ControlMainPanel.getSize().height);
 
     }
 

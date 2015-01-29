@@ -477,7 +477,11 @@ static int ReadPCIState(void * pdev, PCIState * pcistate)
     pcistate->LinkState = LINK_UP;
     pcistate->VendorId = PCI_VENDOR_XILINX;
 #ifdef HW_SGL_DESIGN
+#ifdef ETH_APP
+    pcistate->DeviceId = NWL_DMA_HW_SGL_ETHER;
+#else
     pcistate->DeviceId = NWL_DMA_HW_SGL_CNTRL;
+#endif
 #else
     pcistate->DeviceId = NWL_DMA_VAL_DEVID;
 #endif

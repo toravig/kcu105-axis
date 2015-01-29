@@ -183,6 +183,14 @@ JNIEXPORT jint JNICALL Java_com_xilinx_ultrascale_jni_DriverInfoGen_ReadDump
 JNIEXPORT jint JNICALL Java_com_xilinx_ultrascale_jni_DriverInfoGen_BarInfo
 (JNIEnv *, jobject);
 
+/*
+ * Class:     com_xilinx_ultrascale_jni_DriverInfoGen
+ * Method:    startVideoTest
+ * Signature: (IIIIII)I
+ */
+JNIEXPORT jint JNICALL Java_com_xilinx_ultrascale_jni_DriverInfoGen_ResetVDMA
+  (JNIEnv *, jobject, jint, jint, jint, jint, jint, jint);
+
 #ifdef __cplusplus
 }
 #endif

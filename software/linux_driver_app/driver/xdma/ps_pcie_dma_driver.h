@@ -75,6 +75,7 @@
 #define NWL_DMA_VAL_DEVID_VIDEO (0x8043)
 #define NWL_DMA_x4G1_PFMON_DEVID (0x7024) //x4g1 perfmon
 #define NWL_DMA_HW_SGL_CNTRL (0x8082) //SGL controlled by HW logic
+#define NWL_DMA_HW_SGL_ETHER (0x8182) //SGL controlled by HW logic
 
 /* 
  * Number of packets after which post processing worker thread must yield. This needs to be tuned

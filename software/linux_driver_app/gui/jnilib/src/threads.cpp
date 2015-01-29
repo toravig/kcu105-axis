@@ -244,6 +244,30 @@ int StartVideoTest(int videofd, int engine, int testmode, int maxSize)
 	return retval;
 }
 
+int ResetVDMA(int videofd, int engine, int testmode, int maxSize)
+{
+	int retval=-1;
+	TestCmd testCmd;
+
+	testCmd.Engine = engine;
+	testCmd.TestMode = testmode;
+	testCmd.MaxPktSize = maxSize; 
+
+	testCmd.TestMode |= TEST_STOP;
+
+	//printf("mode is %x engine is %d packet size %d \n", testCmd.TestMode,testCmd.Engine,testCmd.MaxPktSize);
+
+	log_verbose("videofd %d", videofd); 
+	retval = ioctl(videofd, ISET_RESET_VDMA, &testCmd);
+	if(retval != 0)
+	{
+		printf("##Error In Ioctl "); 
+		return -1;
+	}
+
+	retval = 0;
+	return retval;
+}
 int StopVideoTest(int videofd, int engine, int testmode, int maxSize)
 {
 	int retval=-1;

@@ -134,6 +134,7 @@ int ctrlfd=-1;
 int ctrlfd1=-1;
 int videofd=-1;
 int StartVideoTest(int ctrlfd, int engine, int testmode, int maxSize);
+int ResetVDMA(int ctrlfd, int engine, int testmode, int maxSize);
 int StopVideoTest(int ctrlfd, int engine, int testmode, int maxSize);
 int SetSobelParams(int ctrlfd, int engine, int testmode, int maxSize);
 int StartTest(int ctrlfd, int engine, int testmode, int maxSize);
@@ -736,5 +737,27 @@ JNIEXPORT jint JNICALL Java_com_xilinx_ultrascale_jni_DriverInfoGen_BarInfo(JNIE
      env->SetIntArrayRegion(epinfo, 0, 2, tmp); 
      env->CallVoidMethod(obj, bar_callback, epinfo, ret);
      return 0;
+}
+JNIEXPORT jint JNICALL Java_com_xilinx_ultrascale_jni_DriverInfoGen_ResetVDMA(JNIEnv *env, jobject obj, jint engine, jint testmode, jint smincoef, jint smaxcoef, jint invert, jint maxsize){
+
+        //printf("engine: %d  testmode: %d min: %d max: %d invert:%d size:%d \n",engine,testmode,smincoef,smaxcoef,invert,maxsize);
+        int tmode = 0;
+        if(engine == 0)
+        {
+                tmode |= ENABLE_LOOPBACK;
+                smincoef = smincoef & SOBEL_MIN_COEF_MASK;
+                tmode = tmode | smincoef;
+
+
+                smaxcoef = smaxcoef << 24;
+                smaxcoef = smaxcoef & SOBEL_MAX_COEF_MASK;
+                tmode = tmode | smaxcoef;
+
+                if(invert == 1)
+                        tmode |= ENABLE_SOBELFILTER_INVERT;
+        }
+        if (testmode == 7)
+           tmode |= (ENABLE_VIDEOLOOPBACK | ENABLE_SOBELFILTER);
+        return ResetVDMA(videofd, engine, tmode, maxsize);
 }
 

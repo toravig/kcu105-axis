@@ -547,12 +547,6 @@ public class MainScreen_video extends javax.swing.JFrame {
         topChartperfpanel = new javax.swing.JPanel();
         bottomChartperfpanel = new javax.swing.JPanel();
         sysmonpanel = new javax.swing.JPanel();
-        tempholdPanel = new javax.swing.JPanel();
-        tempvaluePanel = new javax.swing.JPanel();
-        TempMeasureLabel = new javax.swing.JLabel();
-        MinorTempLabel = new javax.swing.JLabel();
-        MajorTempLabel = new javax.swing.JLabel();
-        jLabel1 = new javax.swing.JLabel();
         PowerPanel = new javax.swing.JPanel();
         jPanel1 = new javax.swing.JPanel();
         PcieEndStatuspanel = new javax.swing.JPanel();
@@ -562,6 +556,13 @@ public class MainScreen_video extends javax.swing.JFrame {
         jScrollPane3 = new javax.swing.JScrollPane();
         hostsysmontable = new javax.swing.JTable();
         jPanel2 = new javax.swing.JPanel();
+        tempholdPanel = new javax.swing.JPanel();
+        tempvaluePanel = new javax.swing.JPanel();
+        TempMeasureLabel = new javax.swing.JLabel();
+        MinorTempLabel = new javax.swing.JLabel();
+        MajorTempLabel = new javax.swing.JLabel();
+        MajorTempLabel3 = new javax.swing.JLabel();
+        jLabel1 = new javax.swing.JLabel();
         statusPanel = new javax.swing.JPanel();
         HeadingPanel = new javax.swing.JPanel();
         headinglable = new javax.swing.JLabel();
@@ -2336,66 +2337,13 @@ public class MainScreen_video extends javax.swing.JFrame {
 
         tabbedPanel.addTab("Performance Plots", PerformancePlotTab);
 
-        tempvaluePanel.setBackground(java.awt.Color.black);
-        tempvaluePanel.setBorder(javax.swing.BorderFactory.createBevelBorder(javax.swing.border.BevelBorder.RAISED));
-        tempvaluePanel.setToolTipText("Temp");
-
-        TempMeasureLabel.setBackground(java.awt.Color.black);
-
-        javax.swing.GroupLayout tempvaluePanelLayout = new javax.swing.GroupLayout(tempvaluePanel);
-        tempvaluePanel.setLayout(tempvaluePanelLayout);
-        tempvaluePanelLayout.setHorizontalGroup(
-            tempvaluePanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, tempvaluePanelLayout.createSequentialGroup()
-                .addComponent(MajorTempLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 25, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(0, 0, Short.MAX_VALUE)
-                .addComponent(MinorTempLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 25, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(0, 0, 0)
-                .addComponent(TempMeasureLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 25, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(0, 0, 0))
-        );
-        tempvaluePanelLayout.setVerticalGroup(
-            tempvaluePanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, tempvaluePanelLayout.createSequentialGroup()
-                .addGap(0, 0, Short.MAX_VALUE)
-                .addGroup(tempvaluePanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(MinorTempLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 31, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(TempMeasureLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 31, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(MajorTempLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 31, javax.swing.GroupLayout.PREFERRED_SIZE)))
-        );
-
-        jLabel1.setFont(new java.awt.Font("Tahoma", 1, 12)); // NOI18N
-        jLabel1.setText("Die Temperature :");
-
-        javax.swing.GroupLayout tempholdPanelLayout = new javax.swing.GroupLayout(tempholdPanel);
-        tempholdPanel.setLayout(tempholdPanelLayout);
-        tempholdPanelLayout.setHorizontalGroup(
-            tempholdPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, tempholdPanelLayout.createSequentialGroup()
-                .addContainerGap()
-                .addComponent(jLabel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addGap(18, 18, 18)
-                .addComponent(tempvaluePanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(30, 30, 30))
-        );
-        tempholdPanelLayout.setVerticalGroup(
-            tempholdPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, tempholdPanelLayout.createSequentialGroup()
-                .addGap(0, 0, Short.MAX_VALUE)
-                .addComponent(tempvaluePanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, tempholdPanelLayout.createSequentialGroup()
-                .addContainerGap()
-                .addComponent(jLabel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addContainerGap())
-        );
-
         PowerPanel.setBorder(javax.swing.BorderFactory.createTitledBorder(""));
 
         javax.swing.GroupLayout PowerPanelLayout = new javax.swing.GroupLayout(PowerPanel);
         PowerPanel.setLayout(PowerPanelLayout);
         PowerPanelLayout.setHorizontalGroup(
             PowerPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 0, Short.MAX_VALUE)
+            .addGap(0, 350, Short.MAX_VALUE)
         );
         PowerPanelLayout.setVerticalGroup(
             PowerPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -2519,6 +2467,61 @@ public class MainScreen_video extends javax.swing.JFrame {
             .addGap(0, 16, Short.MAX_VALUE)
         );
 
+        tempvaluePanel.setBackground(java.awt.Color.black);
+        tempvaluePanel.setBorder(javax.swing.BorderFactory.createBevelBorder(javax.swing.border.BevelBorder.RAISED));
+        tempvaluePanel.setToolTipText("Temp");
+
+        TempMeasureLabel.setBackground(java.awt.Color.black);
+
+        javax.swing.GroupLayout tempvaluePanelLayout = new javax.swing.GroupLayout(tempvaluePanel);
+        tempvaluePanel.setLayout(tempvaluePanelLayout);
+        tempvaluePanelLayout.setHorizontalGroup(
+            tempvaluePanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, tempvaluePanelLayout.createSequentialGroup()
+                .addGap(0, 0, Short.MAX_VALUE)
+                .addComponent(MajorTempLabel3, javax.swing.GroupLayout.PREFERRED_SIZE, 25, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(0, 0, 0)
+                .addComponent(MajorTempLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 25, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(0, 0, 0)
+                .addComponent(MinorTempLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 25, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(0, 0, 0)
+                .addComponent(TempMeasureLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 25, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(0, 0, 0))
+        );
+        tempvaluePanelLayout.setVerticalGroup(
+            tempvaluePanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, tempvaluePanelLayout.createSequentialGroup()
+                .addGap(0, 0, Short.MAX_VALUE)
+                .addGroup(tempvaluePanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                    .addComponent(MinorTempLabel, javax.swing.GroupLayout.DEFAULT_SIZE, 31, Short.MAX_VALUE)
+                    .addComponent(TempMeasureLabel, javax.swing.GroupLayout.DEFAULT_SIZE, 31, Short.MAX_VALUE)
+                    .addComponent(MajorTempLabel, javax.swing.GroupLayout.DEFAULT_SIZE, 31, Short.MAX_VALUE)
+                    .addComponent(MajorTempLabel3, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
+        );
+
+        jLabel1.setFont(new java.awt.Font("Tahoma", 1, 12)); // NOI18N
+        jLabel1.setText("Die Temperature :");
+
+        javax.swing.GroupLayout tempholdPanelLayout = new javax.swing.GroupLayout(tempholdPanel);
+        tempholdPanel.setLayout(tempholdPanelLayout);
+        tempholdPanelLayout.setHorizontalGroup(
+            tempholdPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, tempholdPanelLayout.createSequentialGroup()
+                .addGap(23, 23, 23)
+                .addComponent(jLabel1, javax.swing.GroupLayout.DEFAULT_SIZE, 136, Short.MAX_VALUE)
+                .addGap(18, 18, 18)
+                .addComponent(tempvaluePanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap())
+        );
+        tempholdPanelLayout.setVerticalGroup(
+            tempholdPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, tempholdPanelLayout.createSequentialGroup()
+                .addGap(0, 4, Short.MAX_VALUE)
+                .addGroup(tempholdPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(jLabel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(tempvaluePanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+        );
+
         javax.swing.GroupLayout sysmonpanelLayout = new javax.swing.GroupLayout(sysmonpanel);
         sysmonpanel.setLayout(sysmonpanelLayout);
         sysmonpanelLayout.setHorizontalGroup(
@@ -2526,31 +2529,31 @@ public class MainScreen_video extends javax.swing.JFrame {
             .addGroup(sysmonpanelLayout.createSequentialGroup()
                 .addGap(21, 21, 21)
                 .addComponent(jPanel2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(266, 349, Short.MAX_VALUE))
+                .addGap(266, 350, Short.MAX_VALUE))
             .addGroup(sysmonpanelLayout.createSequentialGroup()
                 .addContainerGap()
                 .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, 246, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGroup(sysmonpanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(sysmonpanelLayout.createSequentialGroup()
-                        .addGap(18, 18, Short.MAX_VALUE)
-                        .addComponent(tempholdPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(15, 15, 15))
-                    .addGroup(sysmonpanelLayout.createSequentialGroup()
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(PowerPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addGap(5, 5, 5))))
+                        .addGap(5, 5, 5))
+                    .addGroup(sysmonpanelLayout.createSequentialGroup()
+                        .addGap(26, 26, 26)
+                        .addComponent(tempholdPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))))
         );
         sysmonpanelLayout.setVerticalGroup(
             sysmonpanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(sysmonpanelLayout.createSequentialGroup()
-                .addGap(6, 6, 6)
                 .addGroup(sysmonpanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(sysmonpanelLayout.createSequentialGroup()
+                        .addGap(6, 6, 6)
                         .addComponent(tempholdPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(PowerPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                     .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, sysmonpanelLayout.createSequentialGroup()
-                        .addGap(6, 6, 6)
+                        .addGap(12, 12, 12)
                         .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, 509, javax.swing.GroupLayout.PREFERRED_SIZE)))
                 .addGap(474, 474, 474)
                 .addComponent(jPanel2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
@@ -3914,110 +3917,132 @@ public class MainScreen_video extends javax.swing.JFrame {
         }
 
         if (testStarted) {
-            if (screenMode == 7) {
+            if (incValue > 1) {
+                if (screenMode == 7) {
 
-                pcieTxTextField3.setText(String.format("%2.3f", trnStats.LTX));
-                pcieRxTextField3.setText(String.format("%2.3f", trnStats.LRX));
+                    pcieTxTextField3.setText(String.format("%2.3f", trnStats.LTX));
+                    pcieRxTextField3.setText(String.format("%2.3f", trnStats.LRX));
 
-                //  change here for the integration.
-                axiTxTextField3.setText(String.format("%2.3f", trnStats.WBC_APM));
-                axiRxTextField3.setText(String.format("%2.3f", trnStats.RBC_APM));
+                    //  change here for the integration.
+                    axiTxTextField3.setText(String.format("%2.3f", trnStats.WBC_APM));
+                    axiRxTextField3.setText(String.format("%2.3f", trnStats.RBC_APM));
 
-                // DMA data
+                    // DMA data
 //        ddrTxTextField.setText(String.format("%2.3f", trnStats.WBC_DDR));
 //        ddrRxTextField.setText(String.format("%2.3f", trnStats.RBC_DDR));
-                // error log
-                for (int i = 0; i < estate.length; i++) {
-                    if (estate[0].srcErrs != 0) {
-                        messageLog1.append("Error :: Source error occured on engine " + i + "\n");
-                    }
-                    if (estate[0].destErrs != 0) {
-                        messageLog1.append("Error :: Destination error occured on engine " + i + "\n");
-                    }
-                    if (estate[0].internalErrs != 0) {
-                        messageLog1.append("Error :: Internal error occured on engine " + i + "\n");
-                    }
+                    // error log
+                    for (int i = 0; i < estate.length; i++) {
+                        if (estate[0].srcErrs != 0) {
+                            messageLog1.append("Error :: Source error occured on engine " + i + "\n");
+                        }
+                        if (estate[0].destErrs != 0) {
+                            messageLog1.append("Error :: Destination error occured on engine " + i + "\n");
+                        }
+                        if (estate[0].internalErrs != 0) {
+                            messageLog1.append("Error :: Internal error occured on engine " + i + "\n");
+                        }
 
-                }
-            } else if (screenMode == 2) {// accelerator mode from axi mm data plane
-                pcieTxTextField4.setText(String.format("%2.3f", trnStats.LTX));
-                pcieRxTextField4.setText(String.format("%2.3f", trnStats.LRX));
+                    }
+                } else if (screenMode == 2) {// accelerator mode from axi mm data plane
+                    pcieTxTextField4.setText(String.format("%2.3f", trnStats.LTX));
+                    pcieRxTextField4.setText(String.format("%2.3f", trnStats.LRX));
 
-                //  change here for the integration.
-                axiTxTextField4.setText(String.format("%2.3f", trnStats.WBC_APM));
-                axiRxTextField4.setText(String.format("%2.3f", trnStats.RBC_APM));
+                    //  change here for the integration.
+                    axiTxTextField4.setText(String.format("%2.3f", trnStats.WBC_APM));
+                    axiRxTextField4.setText(String.format("%2.3f", trnStats.RBC_APM));
 
-                // DMA data
+                    // DMA data
 //        ddrTxTextField.setText(String.format("%2.3f", trnStats.WBC_DDR));
 //        ddrRxTextField.setText(String.format("%2.3f", trnStats.RBC_DDR));
-                // error log
-                for (int i = 0; i < estate.length; i++) {
-                    if (estate[0].srcErrs != 0) {
-                        messageLog2.append("Error :: Source error occured on engine " + i + "\n");
+                    // error log
+                    for (int i = 0; i < estate.length; i++) {
+                        if (estate[0].srcErrs != 0) {
+                            messageLog2.append("Error :: Source error occured on engine " + i + "\n");
+                        }
+                        if (estate[0].destErrs != 0) {
+                            messageLog2.append("Error :: Destination error occured on engine " + i + "\n");
+                        }
+                        if (estate[0].internalErrs != 0) {
+                            messageLog2.append("Error :: Internal error occured on engine " + i + "\n");
+                        }
+
                     }
-                    if (estate[0].destErrs != 0) {
-                        messageLog2.append("Error :: Destination error occured on engine " + i + "\n");
-                    }
-                    if (estate[0].internalErrs != 0) {
-                        messageLog2.append("Error :: Internal error occured on engine " + i + "\n");
-                    }
 
-                }
+                } else {
+                    pcieTxTextField1.setText(String.format("%2.3f", trnStats.LTX));
+                    pcieRxTextField1.setText(String.format("%2.3f", trnStats.LRX));
 
-            } else {
-                pcieTxTextField1.setText(String.format("%2.3f", trnStats.LTX));
-                pcieRxTextField1.setText(String.format("%2.3f", trnStats.LRX));
+                    //  change here for the integration.
+                    axiTxTextField.setText(String.format("%2.3f", trnStats.WBC_APM));
+                    axiRxTextField.setText(String.format("%2.3f", trnStats.RBC_APM));
 
-                //  change here for the integration.
-                axiTxTextField.setText(String.format("%2.3f", trnStats.WBC_APM));
-                axiRxTextField.setText(String.format("%2.3f", trnStats.RBC_APM));
-
-                // DMA data
+                    // DMA data
 //        ddrTxTextField.setText(String.format("%2.3f", trnStats.WBC_DDR));
 //        ddrRxTextField.setText(String.format("%2.3f", trnStats.RBC_DDR));
-                // error log
-                for (int i = 0; i < estate.length; i++) {
-                    if (estate[0].srcErrs != 0) {
-                        messageLog.append("Error :: Source error occured on engine " + i + "\n");
-                    }
-                    if (estate[0].destErrs != 0) {
-                        messageLog.append("Error :: Destination error occured on engine " + i + "\n");
-                    }
-                    if (estate[0].internalErrs != 0) {
-                        messageLog.append("Error :: Internal error occured on engine " + i + "\n");
-                    }
+                    // error log
+                    for (int i = 0; i < estate.length; i++) {
+                        if (estate[0].srcErrs != 0) {
+                            messageLog.append("Error :: Source error occured on engine " + i + "\n");
+                        }
+                        if (estate[0].destErrs != 0) {
+                            messageLog.append("Error :: Destination error occured on engine " + i + "\n");
+                        }
+                        if (estate[0].internalErrs != 0) {
+                            messageLog.append("Error :: Internal error occured on engine " + i + "\n");
+                        }
 
+                    }
                 }
+                // update charts here.
+                chartTop.updateChart(trnStats.LRX, trnStats.WBC_APM);
+                chartBottom.updateChart(trnStats.LTX, trnStats.RBC_APM);
             }
-            // update charts here.
-            chartTop.updateChart(trnStats.LRX, trnStats.WBC_APM);
-            chartBottom.updateChart(trnStats.LTX, trnStats.RBC_APM);
+            incValue++;
+            if (incValue > 10000) {
+                incValue = 4;
+            }
+        } else {
+            incValue = 0;
         }
         double wbcApmDP0 = 0, rbcApmDP0 = 0, wbcApmDP1 = 0, rbcApmDP1 = 0;
-        if (ethTestStarted0) {
-            //  change here for the integration.
-            axiTxTextField1.setText(String.format("%2.3f", trnStats.WBC_APM));
-            axiRxTextField1.setText(String.format("%2.3f", trnStats.RBC_APM));
-            wbcApmDP0 = trnStats.WBC_APM;
-            rbcApmDP0 = trnStats.RBC_APM;
 
-        }
-        if (ethTestStarted1) {
-            axiTxTextField2.setText(String.format("%2.3f", trnStats.WBC_APM));
-            axiRxTextField2.setText(String.format("%2.3f", trnStats.RBC_APM));
-            wbcApmDP1 = trnStats.WBC_APM;
-            rbcApmDP1 = trnStats.RBC_APM;
-        }
         if (ethTestStarted0 || ethTestStarted1) {
-            // update chart
-            pcieTxTextField2.setText(String.format("%2.3f", trnStats.LTX));
-            pcieRxTextField2.setText(String.format("%2.3f", trnStats.LRX));
+            if (ethincVal > 1) {
+                if (ethTestStarted0) {
+                    //  change here for the integration.
+                    axiTxTextField1.setText(String.format("%2.3f", trnStats.WBC_APM));
+                    axiRxTextField1.setText(String.format("%2.3f", trnStats.RBC_APM));
+                    wbcApmDP0 = trnStats.WBC_APM;
+                    rbcApmDP0 = trnStats.RBC_APM;
 
-            // update charts here.
-            chartTopEth.updateChart(trnStats.LRX, wbcApmDP0, wbcApmDP1);
-            chartBottomEth.updateChart(trnStats.LTX, rbcApmDP0, rbcApmDP1);
+                }
+                if (ethTestStarted1) {
+                    axiTxTextField2.setText(String.format("%2.3f", trnStats.WBC_APM));
+                    axiRxTextField2.setText(String.format("%2.3f", trnStats.RBC_APM));
+                    wbcApmDP1 = trnStats.WBC_APM;
+                    rbcApmDP1 = trnStats.RBC_APM;
+                }
+                if (ethTestStarted0 || ethTestStarted1) {
+                    // update chart
+                    pcieTxTextField2.setText(String.format("%2.3f", trnStats.LTX));
+                    pcieRxTextField2.setText(String.format("%2.3f", trnStats.LRX));
+
+                    // update charts here.
+                    chartTopEth.updateChart(trnStats.LRX, wbcApmDP0, wbcApmDP1);
+                    chartBottomEth.updateChart(trnStats.LTX, rbcApmDP0, rbcApmDP1);
+                }
+            }
+            ethincVal++;
+            if (ethincVal > 10000) {
+                ethincVal = 4;
+            }
+        } else {
+            ethincVal = 0;
+
         }
     }
+    int incValue = 0;
+    int ethincVal = 0;
 
     public void updatePowerAndTemp() {
         if (Develop.production == 1) {
@@ -4025,12 +4050,17 @@ public class MainScreen_video extends javax.swing.JFrame {
 
             PowerStats ps = di.getPowerStats();
 
-            MajorTempLabel.setIcon(ledicons[ps.die_temp / 10]);
-            MinorTempLabel.setIcon(ledicons[ps.die_temp % 10]);
+            MajorTempLabel3.setIcon(ledicons[ps.die_temp / 100]);
+            int tempVal = ps.die_temp;
+            if (ps.die_temp >= 100) {
+                tempVal -= 100;
+            }
+            MajorTempLabel.setIcon(ledicons[tempVal / 10]);
+            MinorTempLabel.setIcon(ledicons[tempVal % 10]);
             TempMeasureLabel.setText("" + "°C");
 
-            chart1.updateChart((double) ps.vccint / 1000.0, (double) ps.vccaux / 1000.0,
-                    (double) ps.mgtvcc / 1000.0, (double) ps.vccbram / 1000.0);
+            chart1.updateChart((double) ps.vccint / 1000.0,(double) ps.mgtvcc / 1000.0, (double) ps.vccaux / 1000.0,
+                     (double) ps.vccbram / 1000.0);
         } else { // dummy values
             MajorTempLabel.setIcon(ledicons[32 / 10]);
             MinorTempLabel.setIcon(ledicons[32 % 10]);
@@ -4169,6 +4199,7 @@ public class MainScreen_video extends javax.swing.JFrame {
     private javax.swing.JCheckBox GeneratorCheckbox3;
     private javax.swing.JPanel HeadingPanel;
     private javax.swing.JLabel MajorTempLabel;
+    private javax.swing.JLabel MajorTempLabel3;
     private javax.swing.JLabel MinorTempLabel;
     private javax.swing.JPanel PcieEndStatuspanel;
     private javax.swing.JPanel PerformancePlotTab;
