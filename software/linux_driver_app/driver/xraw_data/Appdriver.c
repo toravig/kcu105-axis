@@ -439,7 +439,7 @@ void cbk_data_rxpump(struct _ps_pcie_dma_chann_desc *ptr_chann, void *data, unsi
       page_cache_release( (struct page *)pbuf->pageAddr);
 #if 0
 	 pktSize = pktSize + pbuf->size;
-      if (flags & PKT_SP)
+      if (flags & PKT_SOP)
 	    {
 	      usrAddr = pbuf->bufInfo;
           pktSize = pbuf->size;
