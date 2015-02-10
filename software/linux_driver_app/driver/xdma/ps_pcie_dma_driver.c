@@ -16,7 +16,7 @@
 
 #include "ps_pcie_dma_driver.h"
 #include "../include/xpmon_be.h"
-
+#include "../include/xdebug.h"
 #if defined(VIDEO_ACC_DESIGN)
 #define NOBH 1
 #else
@@ -56,13 +56,16 @@ u32 DriverState = UNINITIALIZED;
 PowerMonitorVal pmval;
 
 const char ps_pcie_driver_name[] = "PS_PCIE_XILINX_DMA_DRIVER";
+
+#define XIo_In32(addr)      (readl((unsigned int *)(addr)))
+#define XIo_Out32(addr, data) (writel((data), (unsigned int *)(addr)))
 /*
-* Global linked list head pointer for DMA descriptor list
-* maintained by host driver. Each descriptor correspinds to each 
-* card is system that employs the DMA we are interested in.
-* The actual job of detecting the card is done by the higher layer (application specific)
-* driver that is above this DMA driver.
-*/
+ * Global linked list head pointer for DMA descriptor list
+ * maintained by host driver. Each descriptor correspinds to each 
+ * card is system that employs the DMA we are interested in.
+ * The actual job of detecting the card is done by the higher layer (application specific)
+ * driver that is above this DMA driver.
+ */
 static ps_pcie_dma_desc_t g_host_dma_desc = {0}; //TODO this has to go and we need to support multiple EPs
 
 static DEFINE_SPINLOCK(DmaStatsLock);
@@ -72,110 +75,23 @@ static irqreturn_t ps_pcie_intr_handler(int irq, void *data);
 static irqreturn_t ps_pcie_intr_handler_no_msix(int irq, void *data);
 
 
-static int heart_beat_function(void *data)
-{
-	ps_pcie_dma_chann_desc_t *ptr_chann = (ps_pcie_dma_chann_desc_t*)data;
-	bool chk_hbeat;
-	unsigned long flags;
-	unsigned int host_2_card_data[DMA_NUM_SCRPAD_REGS];
-	unsigned int card_2_host_data[DMA_NUM_SCRPAD_REGS];
-
-	do
-	{
-		int ret;
-		unsigned int retries = 5;
-		unsigned long tmo = jiffies + (HEART_BEAT_INTERVAL_SECS * HZ);
-		unsigned int host_2_card_data[DMA_NUM_SCRPAD_REGS] = {0};
-		unsigned int card_2_host_data[DMA_NUM_SCRPAD_REGS] = {0};
-try_again:
-		set_task_state(current, TASK_INTERRUPTIBLE);
-		schedule_timeout(tmo);
-
-		host_2_card_data[0] = XLNX_CMD_CHANN_HBEAT;
-
-		ret = xlnx_do_scrtchpd_txn_from_host(ptr_chann,
-								   host_2_card_data,
-								   sizeof(host_2_card_data),
-								   card_2_host_data,
-								   sizeof(card_2_host_data));
-		if(ret < XLNX_SUCCESS) 
-		{
-			if(ret == XLNX_SCRATCH_PAD_IO_IN_PROGRESS && retries) 
-			{
-				retries--;
-				tmo = jiffies + ((HEART_BEAT_INTERVAL_SECS/10) * HZ);
-				goto try_again;
-			}
-			else
-			{
-				printk(KERN_ERR"\nERROR!!! unable to write heartbeat, scratchpad interface busy\n");
-				//BUG_ON(true);
-			}
-		}
-		else
-		{
-			LOCK_DMA_CHANNEL(&ptr_chann->channel_lock);
-			if(card_2_host_data[0] == XLNX_RSP_CHANN_HBEAT) 
-			{
-				/* EP side of channel is alive */
-				if(ptr_chann->chann_state == XLNX_DMA_CHANN_NOT_READY_EP) 
-				{
-					ptr_chann->chann_state = XLNX_DMA_CHANN_NO_ERR;
-
-					/* Fire callback */
-					if(ptr_chann->ptr_func_health) 
-					{
-						ptr_chann->ptr_func_health(ptr_chann);
-					}
-				}
-			}
-			else
-			{
-				ptr_chann->chann_state = XLNX_DMA_CHANN_NO_HBEAT_FROM_EP;
-				printk(KERN_ERR"\nERROR!!! No heartbeat from EP\n");
-
-				if(ptr_chann->chann_state != XLNX_DMA_CHANN_NO_HBEAT_FROM_EP) 
-				{
-                    /* Fire callback */
-					if(ptr_chann->ptr_func_health) 
-					{
-						ptr_chann->ptr_func_health(ptr_chann);
-					}
-				}
-
-				ptr_chann->chk_hbeat = false;
-			}
-			UNLOCK_DMA_CHANNEL(&ptr_chann->channel_lock);
-		}
-
-
-
-		LOCK_DMA_CHANNEL(&ptr_chann->channel_lock);
-		chk_hbeat = ptr_chann->chk_hbeat;
-		UNLOCK_DMA_CHANNEL(&ptr_chann->channel_lock);
-	}while(chk_hbeat == true);
-
-	return 0;
-}
-
-
 static int register_interrupt_handler(unsigned int irq_no, const char *hndlr_name,
-								  ps_pcie_dma_desc_t *ptr_dma_desc)
+		ps_pcie_dma_desc_t *ptr_dma_desc)
 {
-	
+
 	int retval = XLNX_SUCCESS;
-	
+
 
 	/* Register interrupt handler if not already done */
 	if(ptr_dma_desc->intr_hndlr_registered == false) 
 	{
 		int rc = request_irq(irq_no, ps_pcie_intr_handler_no_msix, IRQF_SHARED,
-			hndlr_name, ptr_dma_desc);
+				hndlr_name, ptr_dma_desc);
 		if (rc) {
 			printk(KERN_ERR"\nUnable to request IRQ %p, error %d\n",
 					ptr_dma_desc->device, rc);
 			retval = XLNX_INTERRUPT_REG_FAIL;
-        }
+		}
 		else
 		{
 			ptr_dma_desc->intr_hndlr_registered = true;
@@ -185,14 +101,18 @@ static int register_interrupt_handler(unsigned int irq_no, const char *hndlr_nam
 
 	return retval;
 }
-
+/*
+ * Function returns device structure of PCIe device
+ *
+ *
+ */
 static inline struct device *nwl_pci_dev_to_dev(struct pci_dev *pdev)
 {
-         return &pdev->dev;
+	return &pdev->dev;
 }
 
 static int nwl_dma_is_chann_alloc_ep(ps_pcie_dma_desc_t * ptr_dma_desc, 
-									 unsigned int channel_id, direction_t dir)
+		unsigned int channel_id, direction_t dir)
 {
 	u8 __iomem *ptr_temp_chann_regs = ptr_dma_desc->dma_chann_reg_virt_base_addr + (channel_id * DMA_REG_TOT_BYTES);
 	unsigned int offset = DMA_SRCQPTRLO_REG_OFFSET;
@@ -208,11 +128,11 @@ static int nwl_dma_is_chann_alloc_ep(ps_pcie_dma_desc_t * ptr_dma_desc,
 		/* We want to send data to card, so ep will have configured destination Q for rhis channel */
 		offset = DMA_DSTQPTRLO_REG_OFFSET;
 	}
-	
+
 	printk(KERN_ERR"\nCheck if Channel is allocated in EP\n");
 
 	regval = RD_DMA_REG(ptr_temp_chann_regs, offset);
-	
+
 
 	if(!(regval & DMA_QPTRLO_Q_ENABLE_BIT)) 
 	{
@@ -225,9 +145,6 @@ static int nwl_dma_is_chann_alloc_ep(ps_pcie_dma_desc_t * ptr_dma_desc,
 	return retval;
 }
 
-#define XIo_In32(addr)      (readl((unsigned int *)(addr)))
-#define XIo_Out32(addr, data) (writel((data), (unsigned int *)(addr)))
-
 /* InitBridge Function Initializes and configures Bridge in DMA.
  *
  *
@@ -235,161 +152,157 @@ static int nwl_dma_is_chann_alloc_ep(ps_pcie_dma_desc_t * ptr_dma_desc,
  */
 static void InitBridge(u64 bar0_addr, u64 bar0_addr_p, u64 bar2_addr, u64 bar2_addr_p)
 {
-  u32 reg;
+	u32 reg;
 
-  /* Read breg_cap */		
-  printk("\nData at BAR0 offset (0x8200) = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE  + REG_BRDG_E_BASE + OFFSET_BRDG_E_CAP ));
+	/* Read breg_cap */		
+	printk("\nData at BAR0 offset (0x8200) = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE  + REG_BRDG_E_BASE + OFFSET_BRDG_E_CAP ));
 
-  /* Read breg_src_base and setup bridge translation */
-  reg = XIo_In32(bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_SRC_LO );
-  printk("breg_src_base_lo = %0x\n", reg);
+	/* Read breg_src_base and setup bridge translation */
+	reg = XIo_In32(bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_SRC_LO );
+	printk("breg_src_base_lo = %0x\n", reg);
 
-  /* program breg_src_base the same as what is accessible over PCIe */
-  XIo_Out32((bar0_addr +REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_SRC_LO ),(u32)(bar0_addr_p +REG_BRDG_BASE ));
-  reg = XIo_In32(bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_SRC_LO);
-  printk("breg_src_base_lo = %0x\n", reg);
-  XIo_Out32((bar0_addr +REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_SRC_HI ),(u32)((bar0_addr_p +REG_BRDG_BASE ) >> 32));
-  reg = XIo_In32(bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_SRC_HI);
-  printk("breg_src_base_hi = %0x\n", reg);
+	/* program breg_src_base the same as what is accessible over PCIe */
+	XIo_Out32((bar0_addr +REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_SRC_LO ),(u32)(bar0_addr_p +REG_BRDG_BASE ));
+	reg = XIo_In32(bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_SRC_LO);
+	printk("breg_src_base_lo = %0x\n", reg);
+	XIo_Out32((bar0_addr +REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_SRC_HI ),(u32)((bar0_addr_p +REG_BRDG_BASE ) >> 32));
+	reg = XIo_In32(bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_SRC_HI);
+	printk("breg_src_base_hi = %0x\n", reg);
 #if defined(PFORM_USCALE_NO_EP_PROCESSOR) || defined(DDR_DESIGN)
-/* Max Read and Write Request size on Master AXI-MM interface of DMA */
-  XIo_Out32((bar0_addr + REG_BRDG_BASE + CFG_AXI_MASTER),MAX_RW_AXI_MM);
-/* Programming the FC credits;
- Completion Header Credits=0x60; Completion Data=0x3E0 */
-  XIo_Out32((bar0_addr + REG_BRDG_BASE + CFG_PCIE_CREDIT),FC_COMP_HEADER_DATA);
+	/* Max Read and Write Request size on Master AXI-MM interface of DMA */
+	XIo_Out32((bar0_addr + REG_BRDG_BASE + CFG_AXI_MASTER),MAX_RW_AXI_MM);
+	/* Programming the FC credits;
+	   Completion Header Credits=0x60; Completion Data=0x3E0 */
+	XIo_Out32((bar0_addr + REG_BRDG_BASE + CFG_PCIE_CREDIT),FC_COMP_HEADER_DATA);
 #endif
 #ifdef HW_SGL_DESIGN
 	/* Change AXI Read/Write request size
-	 - 0x22 - 256B for Read & Wr */
-XIo_Out32((bar0_addr + REG_BRDG_BASE + CFG_AXI_MASTER),MAX_RW_AXI_MM);
+	   - 0x22 - 256B for Read & Wr */
+	XIo_Out32((bar0_addr + REG_BRDG_BASE + CFG_AXI_MASTER),MAX_RW_AXI_MM);
 #endif
-  /* Currently setting up only one translation region - might need more as
-   * future DUTs require */
-  /* Read ingress tran cap */
-  printk("Ingress Tran cap (0x8800) = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE ));
-  /* enable translation */  
-  reg = XIo_In32(bar0_addr +REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_CTRL );
-  /* Programming an aperture size of 1M(80000) ,Ingress Enable(00001) */
-  XIo_Out32((bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_CTRL), (reg | 0x00080001));
-  printk("tran_ingress_control = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_CTRL));
-  /*- This translation maps BAR[2] hits to AXI address 0x44A00000
-    - Program src address to be BAR[2] */
-  XIo_Out32((bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_SRC_LO), (u32)bar2_addr_p);
-  printk("tran_src_lo = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_SRC_LO));
-  XIo_Out32((bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_SRC_HI), (u32)((bar2_addr_p)>> 32));
-  printk("tran_src_hi = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_SRC_HI));
-  /*- Program DST address to be AXI domain address for user reg module */
-  XIo_Out32((bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_DST_LO),AXI_DOMAIN_ADDR);
-  printk("tran_dst_lo = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_DST_LO));
+	/* Currently setting up only one translation region - might need more as
+	 * future DUTs require */
+	/* Read ingress tran cap */
+	printk("Ingress Tran cap (0x8800) = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE ));
+	/* enable translation */  
+	reg = XIo_In32(bar0_addr +REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_CTRL );
+	/* Programming an aperture size of 1M(80000) ,Ingress Enable(00001) */
+	XIo_Out32((bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_CTRL), (reg | 0x00080001));
+	printk("tran_ingress_control = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_CTRL));
+	/*- This translation maps BAR[2] hits to AXI address 0x44A00000
+	  - Program src address to be BAR[2] */
+	XIo_Out32((bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_SRC_LO), (u32)bar2_addr_p);
+	printk("tran_src_lo = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_SRC_LO));
+	XIo_Out32((bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_SRC_HI), (u32)((bar2_addr_p)>> 32));
+	printk("tran_src_hi = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_SRC_HI));
+	/*- Program DST address to be AXI domain address for user reg module */
+	XIo_Out32((bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_DST_LO),AXI_DOMAIN_ADDR);
+	printk("tran_dst_lo = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_DST_LO));
 
-/* DST HI will already set to Zero by default */
-//  XIo_Out32((bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_DST_HI),0x00000000);
-//  printk("tran_dst_hi = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_DST_HI));
+	/* DST HI will already set to Zero by default */
+	//  XIo_Out32((bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_DST_HI),0x00000000);
+	//  printk("tran_dst_hi = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE + REG_INGR_AXI_BASE + OFFSET_INGR_AXI_DST_HI));
 
 
 #if defined(VIDEO_ACC_DESIGN)
-  /* Adding DREG capability */
-  //- Read dreg_cap		
-  printk("\nData at BAR0 offset (0x8280) = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE  + REG_BRDG_E_BASE + OFFSET_BRDG_D_CAP ));
+	/* Adding DREG capability */
+	//- Read dreg_cap		
+	printk("\nData at BAR0 offset (0x8280) = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE  + REG_BRDG_E_BASE + OFFSET_BRDG_D_CAP ));
 
- /* Read dreg control register */ 
-  reg = XIo_In32(bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_D_CTRL );
-  printk("\nData at BAR0 offset (0x8288) = %x\n", reg);
+	/* Read dreg control register */ 
+	reg = XIo_In32(bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_D_CTRL );
+	printk("\nData at BAR0 offset (0x8288) = %x\n", reg);
 
-  reg |= 0x00000001;
+	reg |= 0x00000001;
 
-  XIo_Out32(bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_D_CTRL,reg );
-  printk("\nData at BAR0 offset (0x8288) = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE  + REG_BRDG_E_BASE + OFFSET_BRDG_D_CTRL ));
+	XIo_Out32(bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_D_CTRL,reg );
+	printk("\nData at BAR0 offset (0x8288) = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE  + REG_BRDG_E_BASE + OFFSET_BRDG_D_CTRL ));
 
-  /* - Program src address to be BAR[2] */
-  XIo_Out32((bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_D_SRC_LO), 0x80000000);
-  printk("\nData at BAR0 offset (0x8290) = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE  + REG_BRDG_E_BASE + OFFSET_BRDG_D_SRC_LO ));
+	/* - Program src address to be BAR[2] */
+	XIo_Out32((bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_D_SRC_LO), 0x80000000);
+	printk("\nData at BAR0 offset (0x8290) = %x\n", XIo_In32(bar0_addr + REG_BRDG_BASE  + REG_BRDG_E_BASE + OFFSET_BRDG_D_SRC_LO ));
 
-  XIo_Out32((bar0_addr + REG_BRDG_BASE + 0x464), 1);
-  reg = XIo_In32(bar0_addr + REG_BRDG_BASE +0x464);//  RD_DMA_REG(brdg_reg_base, EP_BRDG_REG_MSGF_MSK_OFFSET);
-  printk(KERN_ERR"EP_BRDG_REG_MSGF_MSK_OFFSET = %x\n",reg);
-  
-  reg = XIo_In32(bar0_addr + DMA_AXI_INTR_CNTRL_REG_OFFSET );
-  printk(KERN_ERR"AXI_INTERRUPT_CTRL register val = %x\n",reg);
-  /* Enable AXI Interrupts */
-  reg |= 0x01;
-  XIo_Out32(bar0_addr + DMA_AXI_INTR_CNTRL_REG_OFFSET,reg);
-  printk(KERN_ERR"AXI_INTERRUPT_CTRL register val = %x\n",reg);
+	XIo_Out32((bar0_addr + REG_BRDG_BASE + 0x464), 1);
+	reg = XIo_In32(bar0_addr + REG_BRDG_BASE +0x464);//  RD_DMA_REG(brdg_reg_base, EP_BRDG_REG_MSGF_MSK_OFFSET);
+	printk(KERN_ERR"EP_BRDG_REG_MSGF_MSK_OFFSET = %x\n",reg);
 
-//  XIo_Out32((bar0_addr + DMA_AXI_INTR_ASSRT_REG_OFFSET), 0x8);
+	reg = XIo_In32(bar0_addr + DMA_AXI_INTR_CNTRL_REG_OFFSET );
+	printk(KERN_ERR"AXI_INTERRUPT_CTRL register val = %x\n",reg);
+	/* Enable AXI Interrupts */
+	reg |= 0x01;
+	XIo_Out32(bar0_addr + DMA_AXI_INTR_CNTRL_REG_OFFSET,reg);
+	printk(KERN_ERR"AXI_INTERRUPT_CTRL register val = %x\n",reg);
+
+	//  XIo_Out32((bar0_addr + DMA_AXI_INTR_ASSRT_REG_OFFSET), 0x8);
 #endif
 
-  reg = XIo_In32(bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_CTRL );
-  /* Enable bridge translation with 64K size */
-  printk("Initial e_breg_control= %0x\n", reg);
-  XIo_Out32((bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_CTRL), 0x00040001);
-   reg = XIo_In32(bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_CTRL );
-  printk("e_breg_control= %0x\n", reg);
+	reg = XIo_In32(bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_CTRL );
+	/* Enable bridge translation with 64K size */
+	printk("Initial e_breg_control= %0x\n", reg);
+	XIo_Out32((bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_CTRL), 0x00040001);
+	reg = XIo_In32(bar0_addr + REG_BRDG_BASE + REG_BRDG_E_BASE + OFFSET_BRDG_E_CTRL );
+	printk("e_breg_control= %0x\n", reg);
 
 #ifdef HW_SGL_DESIGN
-XIo_Out32((bar2_addr + USER_BASE + SCAL_FACTOR_REG), 0x1);
+	XIo_Out32((bar2_addr + USER_BASE + SCAL_FACTOR_REG), 0x1);
 #endif
 #if 1
-printk("Scaling factor %x",XIo_In32(bar2_addr + USER_BASE + SCAL_FACTOR_REG));
+	printk("Scaling factor %x",XIo_In32(bar2_addr + USER_BASE + SCAL_FACTOR_REG));
 #ifdef DDR_DESIGN
-/* For x8 Gen3, MIG AXI User Clk is 300MHz */
-XIo_Out32((bar2_addr + USER_BASE + CLK_PERIOD_REG), CLK_250MHZ_PERIOD);            //250MHz clock
-XIo_Out32((bar2_addr + AXI_PERF_MON_BASE + SAMPLE_INTERVAL), CLK_300MHZ_PERIOD);   //300MHz clock
-/* For x4 Gen3, PCIe User clk is 125MHz and MIG AXI User Clk is 267MHz */
-//XIo_Out32((bar2_addr + USER_BASE + CLK_PERIOD_REG), CLK_125MHZ_PERIOD);            //125MHz clock
-//XIo_Out32((bar2_addr + AXI_PERF_MON_BASE + SAMPLE_INTERVAL), CLK_267MHZ_PERIOD);   //267MHz clock
+	/* For x8 Gen3, MIG AXI User Clk is 300MHz */
+	XIo_Out32((bar2_addr + USER_BASE + CLK_PERIOD_REG), CLK_250MHZ_PERIOD);            //250MHz clock
+	XIo_Out32((bar2_addr + AXI_PERF_MON_BASE + SAMPLE_INTERVAL), CLK_300MHZ_PERIOD);   //300MHz clock
+	/* For x4 Gen3, PCIe User clk is 125MHz and MIG AXI User Clk is 267MHz */
+	//XIo_Out32((bar2_addr + USER_BASE + CLK_PERIOD_REG), CLK_125MHZ_PERIOD);            //125MHz clock
+	//XIo_Out32((bar2_addr + AXI_PERF_MON_BASE + SAMPLE_INTERVAL), CLK_267MHZ_PERIOD);   //267MHz clock
 #else
-XIo_Out32((bar2_addr + AXI_PERF_MON_BASE + SAMPLE_INTERVAL), CLK_250MHZ_PERIOD); // 250 MHz
+	XIo_Out32((bar2_addr + AXI_PERF_MON_BASE + SAMPLE_INTERVAL), CLK_250MHZ_PERIOD); // 250 MHz
 #endif 
 
- XIo_Out32((bar2_addr + AXI_PERF_MON_BASE + SAMPLE_INTERVAL_CTRL), 0x2); // Load inteval timer reg value
- XIo_Out32((bar2_addr + AXI_PERF_MON_BASE + SAMPLE_INTERVAL_CTRL), 0x0); // clear load bit
- XIo_Out32((bar2_addr + AXI_PERF_MON_BASE + SAMPLE_INTERVAL_CTRL), 0x101); // enable + reset metric counter after read
+	XIo_Out32((bar2_addr + AXI_PERF_MON_BASE + SAMPLE_INTERVAL_CTRL), 0x2); // Load inteval timer reg value
+	XIo_Out32((bar2_addr + AXI_PERF_MON_BASE + SAMPLE_INTERVAL_CTRL), 0x0); // clear load bit
+	XIo_Out32((bar2_addr + AXI_PERF_MON_BASE + SAMPLE_INTERVAL_CTRL), 0x101); // enable + reset metric counter after read
 
 #ifdef HW_SGL_DESIGN
 #ifdef ETH_APP
- XIo_Out32((bar2_addr +  AXI_PERF_MON_BASE + METRIC_SEL_REG0), 0x52721232);//slotID1-databytecount + slotID0 databytecount
-                                        //  {0,12}              + {1,12}     
+	XIo_Out32((bar2_addr +  AXI_PERF_MON_BASE + METRIC_SEL_REG0), 0x52721232);//slotID1-databytecount + slotID0 databytecount
+	//  {0,12}              + {1,12}     
 #else
-XIo_Out32((bar2_addr +  AXI_PERF_MON_BASE + METRIC_SEL_REG0), 0x1232);//slotID1-databytecount + slotID0 databytecount
+	XIo_Out32((bar2_addr +  AXI_PERF_MON_BASE + METRIC_SEL_REG0), 0x1232);//slotID1-databytecount + slotID0 databytecount
 #endif
 #endif
 
 #ifdef PFORM_USCALE_NO_EP_PROCESSOR
 #if defined(VIDEO_ACC_DESIGN)
- XIo_Out32((bar2_addr +  AXI_PERF_MON_BASE + METRIC_SEL_REG0), 0x22230203);
+	XIo_Out32((bar2_addr +  AXI_PERF_MON_BASE + METRIC_SEL_REG0), 0x22230203);
 #else
- XIo_Out32((bar2_addr +  AXI_PERF_MON_BASE + METRIC_SEL_REG0), 0x0203);
+	XIo_Out32((bar2_addr +  AXI_PERF_MON_BASE + METRIC_SEL_REG0), 0x0203);
 #endif
 #endif                             
- XIo_Out32((bar2_addr + AXI_PERF_MON_BASE + APM_CTRL_REG), 0x1);
+	XIo_Out32((bar2_addr + AXI_PERF_MON_BASE + APM_CTRL_REG), 0x1);
 #endif
 
 }
 
 static void poll_stats(unsigned long __opaque)
 {
-        unsigned long t1;
-        struct pci_dev *pdev = (struct pci_dev *)__opaque;
-        ps_pcie_dma_desc_t *lp = NULL;
-        int i, offset = 0;
-        int val=0;
-        unsigned long t2;
+	unsigned long t1;
+	struct pci_dev *pdev = (struct pci_dev *)__opaque;
+	ps_pcie_dma_desc_t *lp = pci_get_drvdata(pdev);
+	int offset = 0;
+	unsigned long t2;
+	u8 __iomem *base = lp->cntrl_func_virt_base_addr;
+	/* Now, get the TRN statistics 
+	 * Registers to be read for TRN stats 
+	 * This counts all TLPs including header */
 
-    lp = pci_get_drvdata(pdev);
+	t1 = RD_DMA_REG(base, USER_BASE + TX_UTIL_BC);
+	t2 = RD_DMA_REG(base, USER_BASE + RX_UTIL_BC);
 
-        u8 __iomem *base = lp->cntrl_func_virt_base_addr;
-    /* Now, get the TRN statistics 
-     * Registers to be read for TRN stats 
-     * This counts all TLPs including header */
+	TStats[tstatsWrite].LTX = 4*(t1>>2);
 
-        t1 = RD_DMA_REG(base, USER_BASE + TX_UTIL_BC);
-        t2 = RD_DMA_REG(base, USER_BASE + RX_UTIL_BC);
+	TStats[tstatsWrite].LRX = 4*(t2>>2);
 
-        TStats[tstatsWrite].LTX = 4*(t1>>2);
-
-        TStats[tstatsWrite].LRX = 4*(t2>>2);
-		
 
 	TStats[tstatsWrite].scaling_factor = RD_DMA_REG(base, USER_BASE + SCAL_FACTOR_REG);
 
@@ -399,363 +312,348 @@ static void poll_stats(unsigned long __opaque)
 	TStats[tstatsWrite].RBC_APM0 = RD_DMA_REG(base,  AXI_PERF_MON_BASE + APM_METRIC_CNTR2);
 	TStats[tstatsWrite].WBC_APM0 = RD_DMA_REG(base, AXI_PERF_MON_BASE + APM_METRIC_CNTR3 );
 
-    //    printk(KERN_ERR"LTX = %d LRX = %d RBC_APM = %d WBC_APM = %d\n",TStats[tstatsWrite].LTX,\
-      //                 TStats[tstatsWrite].LRX, TStats[tstatsWrite].RBC_APM0, TStats[tstatsWrite].WBC_APM0);
+	log_normal(KERN_ERR"LTX = %d LRX = %d RBC_APM = %d WBC_APM = %d\n",TStats[tstatsWrite].LTX,\
+			TStats[tstatsWrite].LRX, TStats[tstatsWrite].RBC_APM0, TStats[tstatsWrite].WBC_APM0);
 #elif defined(ETH_APP)
 	TStats[tstatsWrite].RBC_APM0 = RD_DMA_REG(base,  AXI_PERF_MON_BASE + APM_METRIC_CNTR0);
 	TStats[tstatsWrite].WBC_APM0 = RD_DMA_REG(base, AXI_PERF_MON_BASE + APM_METRIC_CNTR1 );
 	TStats[tstatsWrite].RBC_APM1 = RD_DMA_REG(base, AXI_PERF_MON_BASE + APM_METRIC_CNTR2 );
 	TStats[tstatsWrite].WBC_APM1 = RD_DMA_REG(base, AXI_PERF_MON_BASE + APM_METRIC_CNTR3 );
-printk("## RBC0 %x WBC0 %x RBC1 %x wbc1 %x ## \n",TStats[tstatsWrite].RBC_APM0,TStats[tstatsWrite].WBC_APM0,TStats[tstatsWrite].RBC_APM1, TStats[tstatsWrite].WBC_APM1);
+	log_normal("## RBC0 %x WBC0 %x RBC1 %x wbc1 %x ## \n",TStats[tstatsWrite].RBC_APM0,TStats[tstatsWrite].WBC_APM0,TStats[tstatsWrite].RBC_APM1, TStats[tstatsWrite].WBC_APM1);
 #else
 	TStats[tstatsWrite].RBC_APM0 = RD_DMA_REG(base,  AXI_PERF_MON_BASE + APM_METRIC_CNTR0);
 	TStats[tstatsWrite].WBC_APM0 = RD_DMA_REG(base, AXI_PERF_MON_BASE + APM_METRIC_CNTR1 );
 #endif
-/* Check for DATA_VERIFY for Checker mode */
+	/* Check for DATA_VERIFY for Checker mode */
 #ifndef DDR_DESIGN
-//	val = RD_DMA_REG(base,GEN_CHECK_OFFSET_START + CHK_STATUS);
-//         if(val)
-//         printk("##### DATA MISMATCH OCCURED %x ##### \n",RD_DMA_REG(base,GEN_CHECK_OFFSET_START + CHK_STATUS));
-#endif		 
-    tstatsWrite += 1;
-    if(tstatsWrite >= MAX_STATS) tstatsWrite = 0;
-
-    if(tstatsNum < MAX_STATS)
-        tstatsNum += 1;
-    /* else move the read pointer forward */
-    else
-    {
-        tstatsRead += 1;
-        if(tstatsRead >= MAX_STATS) tstatsRead = 0;
-    }
-
-    spin_lock(&DmaStatsLock);
-    pmval.vcc = XIo_In32(base+ PVTMON_BASE +PVTMON_VCCINT);
-    pmval.vccaux = XIo_In32(base+PVTMON_BASE+PVTMON_VCCAUX);
-    pmval.vcc3v3 = XIo_In32(base+PVTMON_BASE+PVTMON_VCC3);
-    pmval.vadj = XIo_In32(base+PVTMON_BASE+PVTMON_VADJ);
-    pmval.vcc2v5 = XIo_In32(base+PVTMON_BASE+PVTMON_VCC2);
-    pmval.vcc1v5 = XIo_In32(base+PVTMON_BASE+PVTMON_VCC1);
-    pmval.mgt_avcc = XIo_In32(base+PVTMON_BASE+PVTMON_MGT_AVCC);
-    pmval.mgt_avtt = XIo_In32(base+PVTMON_BASE+PVTMON_MGT_AVTT);
-    pmval.vccaux_io = XIo_In32(base+PVTMON_BASE+PVTMON_VCCAUX_IO);
-    pmval.vccbram = XIo_In32(base+PVTMON_BASE+PVTMON_VCCBRAM);
-    pmval.mgt_vccaux = XIo_In32(base+PVTMON_BASE+PVTMON_MGT_VCCAUX);
-
-    pmval.die_temp = (XIo_In32(base+PVTMON_BASE+PVTMON_TEMP));
-#ifdef DEBUG_VERBOSE
-    log_verbose(KERN_INFO "VCCINT=%x",pmval.vcc);
-    log_verbose(KERN_INFO "VCCAUX=%x",pmval.vccaux);
-    log_verbose(KERN_INFO "VCC3V3=%x",pmval.vcc3v3);
-    log_verbose(KERN_INFO "MGT_AVCC=%x",pmval.mgt_avcc);
-    log_verbose(KERN_INFO "MGT_AVTT=%x",pmval.mgt_avtt);
-    log_verbose(KERN_INFO "VCCAUX_IO=%x",pmval.vccaux_io);
-    log_verbose(KERN_INFO "VCCBRAM=%x",pmval.vccbram);
-    log_verbose(KERN_INFO "DIE_TEMP=%x",pmval.die_temp);
+#ifdef DATA_VERIFY
+	int val=0;
+	val = RD_DMA_REG(base,GEN_CHECK_OFFSET_START + CHK_STATUS);
+	if(val)
+		printk("##### DATA MISMATCH OCCURED %x ##### \n",RD_DMA_REG(base,GEN_CHECK_OFFSET_START + CHK_STATUS));
 #endif
-    spin_unlock(&DmaStatsLock);
+#endif		 
+	tstatsWrite += 1;
+	if(tstatsWrite >= MAX_STATS) tstatsWrite = 0;
 
-    /* Reschedule poll routine */
-    offset = -3;
-    stats_timer.expires = jiffies + HZ + offset;
-    add_timer(&stats_timer);
+	if(tstatsNum < MAX_STATS)
+		tstatsNum += 1;
+	/* else move the read pointer forward */
+	else
+	{
+		tstatsRead += 1;
+		if(tstatsRead >= MAX_STATS) tstatsRead = 0;
+	}
+
+	spin_lock(&DmaStatsLock);
+	pmval.vcc = XIo_In32(base+ PVTMON_BASE +PVTMON_VCCINT);
+	pmval.vccaux = XIo_In32(base+PVTMON_BASE+PVTMON_VCCAUX);
+	pmval.vcc3v3 = XIo_In32(base+PVTMON_BASE+PVTMON_VCC3);
+	pmval.vadj = XIo_In32(base+PVTMON_BASE+PVTMON_VADJ);
+	pmval.vcc2v5 = XIo_In32(base+PVTMON_BASE+PVTMON_VCC2);
+	pmval.vcc1v5 = XIo_In32(base+PVTMON_BASE+PVTMON_VCC1);
+	pmval.mgt_avcc = XIo_In32(base+PVTMON_BASE+PVTMON_MGT_AVCC);
+	pmval.mgt_avtt = XIo_In32(base+PVTMON_BASE+PVTMON_MGT_AVTT);
+	pmval.vccaux_io = XIo_In32(base+PVTMON_BASE+PVTMON_VCCAUX_IO);
+	pmval.vccbram = XIo_In32(base+PVTMON_BASE+PVTMON_VCCBRAM);
+	pmval.mgt_vccaux = XIo_In32(base+PVTMON_BASE+PVTMON_MGT_VCCAUX);
+
+	pmval.die_temp = (XIo_In32(base+PVTMON_BASE+PVTMON_TEMP));
+#ifdef DEBUG_VERBOSE
+	log_verbose(KERN_INFO "VCCINT=%x",pmval.vcc);
+	log_verbose(KERN_INFO "VCCAUX=%x",pmval.vccaux);
+	log_verbose(KERN_INFO "VCC3V3=%x",pmval.vcc3v3);
+	log_verbose(KERN_INFO "MGT_AVCC=%x",pmval.mgt_avcc);
+	log_verbose(KERN_INFO "MGT_AVTT=%x",pmval.mgt_avtt);
+	log_verbose(KERN_INFO "VCCAUX_IO=%x",pmval.vccaux_io);
+	log_verbose(KERN_INFO "VCCBRAM=%x",pmval.vccbram);
+	log_verbose(KERN_INFO "DIE_TEMP=%x",pmval.die_temp);
+#endif
+	spin_unlock(&DmaStatsLock);
+
+	/* Reschedule poll routine */
+	offset = -3;
+	stats_timer.expires = jiffies + HZ + offset;
+	add_timer(&stats_timer);
 }
 
 
 static int ReadPCIState(void * pdev, PCIState * pcistate)
 {
-  int pos;
-  u16 valw;
-  u8 valb;
-  int reg=0,linkUpCap=0;
+	int pos;
+	u16 valw;
+	u8 valb;
+#ifdef USE_LATER
+	int reg=0,linkUpCap=0;
+#endif
+	u64 base;
+	base = (u64 )g_host_dma_desc.cntrl_func_virt_base_addr;
 
-    u64 base;
-    base = g_host_dma_desc.cntrl_func_virt_base_addr;
 
-
-    /* Since probe has succeeded, indicates that link is up. */
-    pcistate->LinkState = LINK_UP;
-    pcistate->VendorId = PCI_VENDOR_XILINX;
+	/* Since probe has succeeded, indicates that link is up. */
+	pcistate->LinkState = LINK_UP;
+	pcistate->VendorId = PCI_VENDOR_XILINX;
 #ifdef HW_SGL_DESIGN
 #ifdef ETH_APP
-    pcistate->DeviceId = NWL_DMA_HW_SGL_ETHER;
+	pcistate->DeviceId = NWL_DMA_HW_SGL_ETHER;
 #else
-    pcistate->DeviceId = NWL_DMA_HW_SGL_CNTRL;
+	pcistate->DeviceId = NWL_DMA_HW_SGL_CNTRL;
 #endif
 #else
-    pcistate->DeviceId = NWL_DMA_VAL_DEVID;
+	pcistate->DeviceId = NWL_DMA_VAL_DEVID;
 #endif
 
 
-    /* Read Interrupt setting - Legacy or MSI/MSI-X */
-    pci_read_config_byte(pdev, PCI_INTERRUPT_PIN, &valb);
-    if(!valb)
-    {
-        if(pci_find_capability(pdev, PCI_CAP_ID_MSIX))
-            pcistate->IntMode = INT_MSIX;
-        else if(pci_find_capability(pdev, PCI_CAP_ID_MSI))
-            pcistate->IntMode = INT_MSI;
-        else
-            pcistate->IntMode = INT_NONE;
-    }
-    else if((valb >= 1) && (valb <= 4))
-        pcistate->IntMode = INT_LEGACY;
-    else
-        pcistate->IntMode = INT_NONE;
-    if((pos = pci_find_capability(pdev, PCI_CAP_ID_EXP)))
-    {
-        /* Read Link Status */
-        pci_read_config_word(pdev, pos+PCI_EXP_LNKSTA, &valw);
-        pcistate->LinkSpeed = (valw & 0x0003);
-        pcistate->LinkWidth = (valw & 0x03f0) >> 4;
-	//	reg=XIo_In32(base+PCIE_CAP_REG);
-	//	linkUpCap= (reg>>4) & 0x1;
-	//	pcistate->LinkUpCap = linkUpCap;
+	/* Read Interrupt setting - Legacy or MSI/MSI-X */
+	pci_read_config_byte(pdev, PCI_INTERRUPT_PIN, &valb);
+	if(!valb)
+	{
+		if(pci_find_capability(pdev, PCI_CAP_ID_MSIX))
+			pcistate->IntMode = INT_MSIX;
+		else if(pci_find_capability(pdev, PCI_CAP_ID_MSI))
+			pcistate->IntMode = INT_MSI;
+		else
+			pcistate->IntMode = INT_NONE;
+	}
+	else if((valb >= 1) && (valb <= 4))
+		pcistate->IntMode = INT_LEGACY;
+	else
+		pcistate->IntMode = INT_NONE;
+	if((pos = pci_find_capability(pdev, PCI_CAP_ID_EXP)))
+	{
+		/* Read Link Status */
+		pci_read_config_word(pdev, pos+PCI_EXP_LNKSTA, &valw);
+		pcistate->LinkSpeed = (valw & 0x0003);
+		pcistate->LinkWidth = (valw & 0x03f0) >> 4;
+#ifdef USE_LATER
+		//	reg=XIo_In32(base+PCIE_CAP_REG);
+		//	linkUpCap= (reg>>4) & 0x1;
+		//	pcistate->LinkUpCap = linkUpCap;
+#endif
+		/* Read MPS & MRRS */
+		pci_read_config_word(pdev, pos+PCI_EXP_DEVCTL, &valw);
+		pcistate->MPS = 128 << ((valw & PCI_EXP_DEVCTL_PAYLOAD) >> 5);
+		pcistate->MRRS = 128 << ((valw & PCI_EXP_DEVCTL_READRQ) >> 12);
+	}
+	else
+	{
+		printk("Cannot find PCI Express Capabilities\n");
+		pcistate->LinkSpeed = pcistate->LinkWidth = 0;
+		pcistate->MPS = pcistate->MRRS = 0;
+	}
+	pcistate->InitFCCplD = XIo_In32(base+USER_BASE +MInitFCCplD)& 0x00000FFF;
+	pcistate->InitFCCplH = XIo_In32(base+USER_BASE +MInitFCCplH)& 0x000000FF;
+	pcistate->InitFCNPD  = XIo_In32(base+USER_BASE +MInitFCNPD) & 0x00000FFF;
+	pcistate->InitFCNPH  = XIo_In32(base+USER_BASE +MInitFCNPH) & 0x000000FF;
+	pcistate->InitFCPD   = XIo_In32(base+USER_BASE +MInitFCPD)  & 0x00000FFF;
+	pcistate->InitFCPH   = XIo_In32(base+USER_BASE +MInitFCPH)  & 0x000000FF;
+	pcistate->Version    = XIo_In32(base+USER_BASE );	
 
-        /* Read MPS & MRRS */
-        pci_read_config_word(pdev, pos+PCI_EXP_DEVCTL, &valw);
-        pcistate->MPS = 128 << ((valw & PCI_EXP_DEVCTL_PAYLOAD) >> 5);
-        pcistate->MRRS = 128 << ((valw & PCI_EXP_DEVCTL_READRQ) >> 12);
-    }
-    else
-    {
-        printk("Cannot find PCI Express Capabilities\n");
-        pcistate->LinkSpeed = pcistate->LinkWidth = 0;
-        pcistate->MPS = pcistate->MRRS = 0;
-    }
-//    printk("base %x ######%X %X %X ",base,XIo_In32(base+USER_BASE +MInitFCCplD)& 0x00000FFF,XIo_In32(base+USER_BASE +MInitFCCplD)& 0x00000FFF);
-    pcistate->InitFCCplD = XIo_In32(base+USER_BASE +MInitFCCplD)& 0x00000FFF;
-    pcistate->InitFCCplH = XIo_In32(base+USER_BASE +MInitFCCplH)& 0x000000FF;
-    pcistate->InitFCNPD  = XIo_In32(base+USER_BASE +MInitFCNPD) & 0x00000FFF;
-    pcistate->InitFCNPH  = XIo_In32(base+USER_BASE +MInitFCNPH) & 0x000000FF;
-    pcistate->InitFCPD   = XIo_In32(base+USER_BASE +MInitFCPD)  & 0x00000FFF;
-    pcistate->InitFCPH   = XIo_In32(base+USER_BASE +MInitFCPH)  & 0x000000FF;
-    pcistate->Version    = XIo_In32(base+USER_BASE );	
-
-    return 0;
+	return 0;
 }
 
 
 /* Character device file operations */
 static int xdma_dev_open(struct inode * in, struct file * filp)
 {
-    if(UserOpen)
-    {
-        printk("Device already in use\n");
-        return -EBUSY;
-    }
+	/* Will restrict more than one file open 
+	*/
+	if(UserOpen)
+	{
+		printk("Device already in use\n");
+		return -EBUSY;
+	}
 
 
-    spin_lock_bh(&DmaStatsLock);
-    UserOpen++;                 /* To prevent more than one GUI */
-    spin_unlock_bh(&DmaStatsLock);
+	spin_lock_bh(&DmaStatsLock);
+	UserOpen++;                 /* To prevent more than one GUI */
+	spin_unlock_bh(&DmaStatsLock);
 
-    return 0;
+	return 0;
 }
 
 
 
 static int xdma_dev_release(struct inode * in, struct file * filp)
 {
-    if(!UserOpen)
-    {
-        /* Should not come here */
-        printk("Device not in use\n");
-        return -EFAULT;
-    }
+	if(!UserOpen)
+	{
+		/* Should not come here */
+		printk("Device not in use\n");
+		return -EFAULT;
+	}
 
-    spin_lock_bh(&DmaStatsLock);
-    UserOpen-- ;
-    spin_unlock_bh(&DmaStatsLock);
+	spin_lock_bh(&DmaStatsLock);
+	UserOpen-- ;
+	spin_unlock_bh(&DmaStatsLock);
 
-    return 0;
+	return 0;
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36)
 static int xdma_dev_ioctl(struct inode * in, struct file * filp,
-                          unsigned int cmd, unsigned long arg)
+		unsigned int cmd, unsigned long arg)
 #else
 static long xdma_dev_ioctl(struct file * filp,
-                          unsigned int cmd, unsigned long arg)
+		unsigned int cmd, unsigned long arg)
 #endif
 {
-    int retval=0;
-    EngState eng;
-    EngStatsArray es;
-    TRNStatsArray tsa;
-    SWStatsArray ssa;
-    DMAStatistics * ds;
-    TRNStatistics * ts;
-    SWStatistics * ss;
-    TestCmd tc;
-    PCIState pcistate;
-    LedStats lstats; 
-   ps_pcie_dma_chann_desc_t *chann_temp;
-  unsigned long flags;
+	int retval=0;
+	EngState eng;
+	TRNStatsArray tsa;
+	TRNStatistics * ts;
+	PCIState pcistate;
+	ps_pcie_dma_chann_desc_t *chann_temp;
+	LedStats lstats; 
 
-    
-   ps_pcie_dma_desc_t *ptr_dma_desc_temp = &g_host_dma_desc;
-    PowerMonitorVal pmval_temp;
 
-    int len, i;
+	ps_pcie_dma_desc_t *ptr_dma_desc_temp = &g_host_dma_desc;
+	PowerMonitorVal pmval_temp;
 
-    int Status_Reg=0;
+	int len, i;
+#if defined(ETH_APP) || defined(DDR_DESIGN)
+	int Status_Reg=0;
 
-    u64 base= ptr_dma_desc_temp->cntrl_func_virt_base_addr;
-    /* Check cmd type and value */
-    if(_IOC_TYPE(cmd) != XPMON_MAGIC) return -ENOTTY;
-    if(_IOC_NR(cmd) > XPMON_MAX_CMD) return -ENOTTY;
+	u64 base= ptr_dma_desc_temp->cntrl_func_virt_base_addr;
+#endif
+	/* Check cmd type and value */
+	if(_IOC_TYPE(cmd) != XPMON_MAGIC) return -ENOTTY;
+	if(_IOC_NR(cmd) > XPMON_MAX_CMD) return -ENOTTY;
 
-    /* Check read/write and corresponding argument */
-    if(_IOC_DIR(cmd) & _IOC_READ)
-        if(!access_ok(VERIFY_WRITE, (void *)arg, _IOC_SIZE(cmd)))
-            return -EFAULT;
-    if(_IOC_DIR(cmd) & _IOC_WRITE)
-        if(!access_ok(VERIFY_READ, (void *)arg, _IOC_SIZE(cmd)))
-            return -EFAULT;
-    /* Looks ok, let us continue */
-    switch(cmd)
-    {
-     case IGET_PCI_STATE:
-        ReadPCIState(ptr_dma_desc_temp->device, &pcistate);
-        if(copy_to_user((PCIState *)arg, &pcistate, sizeof(PCIState)))
-        {
-            printk("copy_to_user failed\n");
-            retval = -EFAULT;
-            break;
-        }
-        break;
-	case IGET_LED_STATISTICS:
+	/* Check read/write and corresponding argument */
+	if(_IOC_DIR(cmd) & _IOC_READ)
+		if(!access_ok(VERIFY_WRITE, (void *)arg, _IOC_SIZE(cmd)))
+			return -EFAULT;
+	if(_IOC_DIR(cmd) & _IOC_WRITE)
+		if(!access_ok(VERIFY_READ, (void *)arg, _IOC_SIZE(cmd)))
+			return -EFAULT;
+	/* Looks ok, let us continue */
+	switch(cmd)
+	{
+		case IGET_PCI_STATE:
+			ReadPCIState(ptr_dma_desc_temp->device, &pcistate);
+			if(copy_to_user((PCIState *)arg, &pcistate, sizeof(PCIState)))
+			{
+				printk("copy_to_user failed\n");
+				retval = -EFAULT;
+				break;
+			}
+			break;
+		case IGET_LED_STATISTICS:
 #ifdef ETH_APP
-        Status_Reg = XIo_In32(base +USER_BASE + 0x418);
+			Status_Reg = XIo_In32(base +USER_BASE + 0x418);
 
-	lstats.Phy0 = (Status_Reg && 0x000000FF) & 0x1;  /* 30th bit 'on' of Status Register indicated Phy 0 link up */
-	lstats.Phy1 = (Status_Reg && 0x0000FF00) & 0x1;  /* 31st bit 'on' of Status Register indicated Phy 1 link up */
+			lstats.Phy0 = (Status_Reg && 0x000000FF) & 0x1;  /* 30th bit 'on' of Status Register indicated Phy 0 link up */
+			lstats.Phy1 = (Status_Reg && 0x0000FF00) & 0x1;  /* 31st bit 'on' of Status Register indicated Phy 1 link up */
 #endif
 #ifdef DDR_DESIGN
-        Status_Reg = XIo_In32(base + USER_BASE + 0x4);	
-	lstats.DdrCalib0 = (Status_Reg) & 0x1  /* 1st bit 'on' of Status Register indicated DDR3 Calibration done*/
+			Status_Reg = XIo_In32(base + USER_BASE + 0x4);	
+			lstats.DdrCalib0 = (Status_Reg) & 0x1  /* 1st bit 'on' of Status Register indicated DDR3 Calibration done*/
 #endif 
-        if(copy_to_user((LedStats *)arg, &lstats, sizeof(LedStats)))
-        {
-            printk("copy_to_user failed\n");
-            retval = -EFAULT;
-            break;
-        }
-        break;
-  
-    case IGET_PMVAL:
-                spin_lock_bh(&DmaStatsLock);
-                memcpy(&pmval_temp,&pmval,sizeof(PowerMonitorVal));
-                spin_unlock_bh(&DmaStatsLock);
-        if(copy_to_user((PowerMonitorVal *)arg, &pmval_temp, sizeof(PowerMonitorVal)))
-        {
-            printk("PMVAL copy_to_user failed\n");
-            retval = -EFAULT;
-        }
-        break;
+				if(copy_to_user((LedStats *)arg, &lstats, sizeof(LedStats)))
+				{
+					printk("copy_to_user failed\n");
+					retval = -EFAULT;
+					break;
+				}
+			break;
 
-    case IGET_ENG_STATE:
-        if(copy_from_user(&eng, (EngState *)arg, sizeof(EngState)))
-        {
-            printk("\ncopy_from_user failed\n");
-            retval = -EFAULT;
-            break;
-        }
+		case IGET_PMVAL:
+			spin_lock_bh(&DmaStatsLock);
+			memcpy(&pmval_temp,&pmval,sizeof(PowerMonitorVal));
+			spin_unlock_bh(&DmaStatsLock);
+			if(copy_to_user((PowerMonitorVal *)arg, &pmval_temp, sizeof(PowerMonitorVal)))
+			{
+				printk("PMVAL copy_to_user failed\n");
+				retval = -EFAULT;
+			}
+			break;
 
-        i = eng.Engine;
-	
-#if 0
-        /* First, check if requested engine is valid */
-        if((i >= MAX_DMA_ENGINES) ||
-          (!((dmaData->engineMask) & (1LL << i))))
-        {
-            printk("Invalid engine %d\n", i);
-            retval = -EFAULT;
-            break;
-        }
-      
-   #endif 
-   
-    chann_temp =  &(ptr_dma_desc_temp->channels[i]);
-//   spin_lock_irqsave(&chann_temp->channel_lock, flags);
- 
-//   eng.SrcErrors = chann_temp->src_sgl_err;
-//   eng.DstErrors = chann_temp->dst_sgl_err;
-//   eng.IntErrors  = chann_temp->internal_err;
-   
-    eng.SrcErrors = 0;
-   eng.DstErrors = 0;
-   eng.IntErrors  = 0;
-//   spin_unlock_irqrestore(&chann_temp->channel_lock, flags);
-        /* First, get the user state */
-   
-      //      eng.Buffers = ustate.Buffers;
-      //      eng.MinPktSize = ustate.MinPktSize;
-     //       eng.MaxPktSize = ustate.MaxPktSize;
-      //      eng.TestMode = ustate.TestMode;
-	//    eng.DataMismatch = ustate.DataMismatch;			
-  
+		case IGET_ENG_STATE:
+			if(copy_from_user(&eng, (EngState *)arg, sizeof(EngState)))
+			{
+				printk("\ncopy_from_user failed\n");
+				retval = -EFAULT;
+				break;
+			}
 
-    
-        if(copy_to_user((EngState *)arg, &eng, sizeof(EngState)))
-        {
-            printk("copy_to_user failed\n");
-            retval = -EFAULT;
-            break;
-        }
-        break;
-case IGET_TRN_STATISTICS:
-		   if(copy_from_user(&tsa, (TRNStatsArray *)arg, sizeof(TRNStatsArray)))
-		   {
-			   printk("copy_from_user failed\n");
-			   retval = -1;
-			   break;
-		   }
-	
-		   ts = tsa.trnptr;
-		   len = 0;
-		   for(i=0; i<tsa.Count; i++)
-		   {
-			   TRNStatistics from;
-	
-			   if(!tstatsNum) break;
-	
-			   spin_lock_bh(&DmaStatsLock);
-			   from = TStats[tstatsRead];
-			   tstatsNum -= 1;
-			   tstatsRead += 1;
-			   if(tstatsRead == MAX_STATS)
-				   tstatsRead = 0;
-			   spin_unlock_bh(&DmaStatsLock);
-	
-			   if(copy_to_user(ts, &from, sizeof(TRNStatistics)))
-			   {
-				   printk("copy_to_user failed\n");
-				   retval = -EFAULT;
-				   break;
-			   }
-	
-			   len++;
-			   ts++;
-		   }
-		   tsa.Count = len;
-		   if(copy_to_user((TRNStatsArray *)arg, &tsa, sizeof(TRNStatsArray)))
-		   {
-			   printk("copy_to_user failed\n");
-			   retval = -EFAULT;
-			   break;
-		   }
-		   break;
+			i = eng.Engine;
+
+			chann_temp =  &(ptr_dma_desc_temp->channels[i]);
+#ifdef USE_LATER
+			/*Use below code to get Actual Error from SG element
+			*/
+
+			unsigned long flags;
+			spin_lock_irqsave(&chann_temp->channel_lock, flags);
+			eng.SrcErrors = chann_temp->src_sgl_err;
+			eng.DstErrors = chann_temp->dst_sgl_err;
+			eng.IntErrors  = chann_temp->internal_err;
+			spin_unlock_irqrestore(&chann_temp->channel_lock, flags);
+#endif  
+
+			eng.SrcErrors = 0;
+			eng.DstErrors = 0;
+			eng.IntErrors  = 0;
+
+			if(copy_to_user((EngState *)arg, &eng, sizeof(EngState)))
+			{
+				printk("copy_to_user failed\n");
+				retval = -EFAULT;
+				break;
+			}
+			break;
+		case IGET_TRN_STATISTICS:
+			if(copy_from_user(&tsa, (TRNStatsArray *)arg, sizeof(TRNStatsArray)))
+			{
+				printk("copy_from_user failed\n");
+				retval = -1;
+				break;
+			}
+
+			ts = tsa.trnptr;
+			len = 0;
+			for(i=0; i<tsa.Count; i++)
+			{
+				TRNStatistics from;
+
+				if(!tstatsNum) break;
+
+				spin_lock_bh(&DmaStatsLock);
+				from = TStats[tstatsRead];
+				tstatsNum -= 1;
+				tstatsRead += 1;
+				if(tstatsRead == MAX_STATS)
+					tstatsRead = 0;
+				spin_unlock_bh(&DmaStatsLock);
+
+				if(copy_to_user(ts, &from, sizeof(TRNStatistics)))
+				{
+					printk("copy_to_user failed\n");
+					retval = -EFAULT;
+					break;
+				}
+
+				len++;
+				ts++;
+			}
+			tsa.Count = len;
+			if(copy_to_user((TRNStatsArray *)arg, &tsa, sizeof(TRNStatsArray)))
+			{
+				printk("copy_to_user failed\n");
+				retval = -EFAULT;
+				break;
+			}
+			break;
 
 
-    default:
-        printk("Invalid command %d\n", cmd);
-        retval = -1;
-        break;
-    }
+		default:
+			printk("Invalid command %d\n", cmd);
+			retval = -1;
+			break;
+	}
 
-    return retval;
+	return retval;
 }
 
 
@@ -763,13 +661,13 @@ case IGET_TRN_STATISTICS:
 
 
 static int /*__devinit*/ nwl_dma_probe(struct pci_dev *pdev,
-                                 const struct pci_device_id *ent)
+		const struct pci_device_id *ent)
 {
 	int err, pci_using_dac,i;
 	ps_pcie_dma_desc_t *ptr_dma_desc_temp = NULL;
-        dev_t xdmaDev;
+	dev_t xdmaDev;
 	int chrRet;
-	 static struct file_operations xdmaDevFileOps;	
+	static struct file_operations xdmaDevFileOps;	
 
 	err = pci_enable_device(pdev);
 	if (err)
@@ -778,7 +676,7 @@ static int /*__devinit*/ nwl_dma_probe(struct pci_dev *pdev,
 	printk(KERN_ERR"\nPCIe device enabled\n");
 
 	if (!dma_set_mask(nwl_pci_dev_to_dev(pdev), DMA_BIT_MASK(64)) &&
-	    !dma_set_coherent_mask(nwl_pci_dev_to_dev(pdev), DMA_BIT_MASK(64))) {
+			!dma_set_coherent_mask(nwl_pci_dev_to_dev(pdev), DMA_BIT_MASK(64))) {
 		pci_using_dac = 1;
 		printk(KERN_ERR"\nPCIe 64bit access capable\n");
 
@@ -786,11 +684,11 @@ static int /*__devinit*/ nwl_dma_probe(struct pci_dev *pdev,
 		err = dma_set_mask(nwl_pci_dev_to_dev(pdev), DMA_BIT_MASK(32));
 		if (err) {
 			err = dma_set_coherent_mask(nwl_pci_dev_to_dev(pdev),
-						    DMA_BIT_MASK(32));
+					DMA_BIT_MASK(32));
 			printk(KERN_ERR"\nPCIe 32bit access capable\n");
 			if (err) {
 				dev_err(nwl_pci_dev_to_dev(pdev), "No usable DMA "
-				        "configuration, aborting\n");
+						"configuration, aborting\n");
 				printk(KERN_ERR"\nError!!! No usable DMA configuration ..........\n");
 				goto err_dma;
 			}
@@ -803,7 +701,7 @@ static int /*__devinit*/ nwl_dma_probe(struct pci_dev *pdev,
 	err = pci_request_regions(pdev, ps_pcie_driver_name);
 	if (err) {
 		dev_err(nwl_pci_dev_to_dev(pdev),
-			"pci_request_regions failed 0x%x\n", err);
+				"pci_request_regions failed 0x%x\n", err);
 		printk(KERN_ERR"\nERROR!!!! PCIe request regions failed\n");
 		goto err_pci_reg;
 	}
@@ -817,8 +715,8 @@ static int /*__devinit*/ nwl_dma_probe(struct pci_dev *pdev,
 	pci_set_master(pdev);
 
 	/*
-	* Allocate a descriptor corresponding to discovered 
-    */
+	 * Allocate a descriptor corresponding to discovered 
+	 */
 	ptr_dma_desc_temp = &g_host_dma_desc; //TODO this is temporary, dynamically alloc and support multiple EPs
 
 	/* Initialize fields of the dma descriptor */
@@ -828,50 +726,50 @@ static int /*__devinit*/ nwl_dma_probe(struct pci_dev *pdev,
 	ptr_dma_desc_temp->num_channels_active = PS_PCIE_NUM_DMA_CHANNELS; //TODO, get from device tree
 	ptr_dma_desc_temp->pform = HOST; //We are the host
 	ptr_dma_desc_temp->num_channels_alloc = 0;
-    
+
 	spin_lock_init(&ptr_dma_desc_temp->dma_lock);
 
-        spin_lock_init(&DmaStatsLock);
+	spin_lock_init(&DmaStatsLock);
 
 	ptr_dma_desc_temp->dma_reg_phy_base_addr = pci_resource_start(pdev, PS_PCIE_BRDG_DMA_CHANN_BAR);
 	ptr_dma_desc_temp->dma_reg_virt_base_addr = ioremap_nocache(ptr_dma_desc_temp->dma_reg_phy_base_addr, 
-																pci_resource_len(pdev, 0));
-    if (!ptr_dma_desc_temp->dma_reg_virt_base_addr) 
+			pci_resource_len(pdev, 0));
+	if (!ptr_dma_desc_temp->dma_reg_virt_base_addr) 
 	{
-	
-			printk(KERN_ERR"\nPCIe ioremap failed ERROR!!!!\n");
-			err = -EIO;
-			goto err_ioremap;
+
+		printk(KERN_ERR"\nPCIe ioremap failed ERROR!!!!\n");
+		err = -EIO;
+		goto err_ioremap;
 	}
 
 	printk(KERN_ERR"\n DMA and Bridge Register Base Physical addr: %x, Virt address %p Length %d\n",(unsigned int)ptr_dma_desc_temp->dma_reg_phy_base_addr, 
-		   ptr_dma_desc_temp->dma_reg_virt_base_addr, (int)pci_resource_len(pdev, 0));
+			ptr_dma_desc_temp->dma_reg_virt_base_addr, (int)pci_resource_len(pdev, 0));
 
 	/* Assign the channel register base address */
 	ptr_dma_desc_temp->dma_chann_reg_virt_base_addr = ptr_dma_desc_temp->dma_reg_virt_base_addr /*+ 0x1000*/;
 
-	
+
 	ptr_dma_desc_temp->cntrl_func_phy_base_addr = pci_resource_start(pdev, PS_PCIE_CNTRL_FUNCT_INGRESS_TRANS_BAR);
 	ptr_dma_desc_temp->cntrl_func_virt_base_addr = ioremap_nocache(ptr_dma_desc_temp->cntrl_func_phy_base_addr, 
-																   pci_resource_len(pdev, PS_PCIE_CNTRL_FUNCT_INGRESS_TRANS_BAR));
+			pci_resource_len(pdev, PS_PCIE_CNTRL_FUNCT_INGRESS_TRANS_BAR));
 	if (!ptr_dma_desc_temp->cntrl_func_virt_base_addr) 
 	{
 
-			printk(KERN_ERR"\nPCIe ioremap failed ERROR!!!!\n");
-			err = -EIO;
-			goto err_ioremap_ingress_bar;
+		printk(KERN_ERR"\nPCIe ioremap failed ERROR!!!!\n");
+		err = -EIO;
+		goto err_ioremap_ingress_bar;
 	}
 
 	printk(KERN_ERR"\n User Registers BAR Physical addr: %x, Virt address %p Length %d\n",(unsigned int)ptr_dma_desc_temp->cntrl_func_phy_base_addr, 
-		   ptr_dma_desc_temp->cntrl_func_virt_base_addr, (int)pci_resource_len(pdev, PS_PCIE_CNTRL_FUNCT_INGRESS_TRANS_BAR));
+			ptr_dma_desc_temp->cntrl_func_virt_base_addr, (int)pci_resource_len(pdev, PS_PCIE_CNTRL_FUNCT_INGRESS_TRANS_BAR));
 
 	/* Initialize the bridge */
 	InitBridge((u64) ptr_dma_desc_temp->dma_reg_virt_base_addr, 
-			   (u64) ptr_dma_desc_temp->dma_reg_phy_base_addr, 
-			   (u64) ptr_dma_desc_temp->cntrl_func_virt_base_addr, 
-			   (u64) ptr_dma_desc_temp->cntrl_func_phy_base_addr);
+			(u64) ptr_dma_desc_temp->dma_reg_phy_base_addr, 
+			(u64) ptr_dma_desc_temp->cntrl_func_virt_base_addr, 
+			(u64) ptr_dma_desc_temp->cntrl_func_phy_base_addr);
 
-  pci_set_drvdata(pdev, ptr_dma_desc_temp);
+	pci_set_drvdata(pdev, ptr_dma_desc_temp);
 
 
 #ifdef USE_MSIX
@@ -925,10 +823,10 @@ static int /*__devinit*/ nwl_dma_probe(struct pci_dev *pdev,
 			{
 				sprintf(ptr_dma_desc_temp->channels[i].msix_hndlr_name, "PS PCIe DMA Chann %d Interrupt Handler",i);
 				if(request_irq(ptr_dma_desc_temp->entries[i].vector,
-							   ps_pcie_intr_handler,
-							   0, 
-							   ptr_dma_desc_temp->channels[i].msix_hndlr_name, 
-							   &ptr_dma_desc_temp->channels[i]))
+							ps_pcie_intr_handler,
+							0, 
+							ptr_dma_desc_temp->channels[i].msix_hndlr_name, 
+							&ptr_dma_desc_temp->channels[i]))
 				{
 					err = XLNX_MSIX_HNDLR_REG_FAIL;
 					goto msix_hndlr_registration_failed;
@@ -950,68 +848,66 @@ static int /*__devinit*/ nwl_dma_probe(struct pci_dev *pdev,
 		goto interrupt_registration_failed;
 	}
 #endif
- /* The following code is for registering as a character device driver.
-     * The GUI will use /dev/xdma_state file to read state & statistics.
-     * Incase of any failure, the driver will come up without device
-     * file support, but statistics will still be visible in the system log.
-     */
-    /* First allocate a major/minor number. */
-    chrRet = alloc_chrdev_region(&xdmaDev, 0, 1, "xdma_stats");
-    if(IS_ERR((int *)chrRet))
-        printk(KERN_ERR "Error allocating char device region\n");
-    else
-    {
-        /* Register our character device */
-        xdmaCdev = cdev_alloc();
-        if(IS_ERR(xdmaCdev))
-        {
-            printk(KERN_ERR "Alloc error registering device driver\n");
-            unregister_chrdev_region(xdmaDev, 1);
-            chrRet = -1;
-        }
-        else
-        {
-            xdmaDevFileOps.owner = THIS_MODULE;
-            xdmaDevFileOps.open = xdma_dev_open;
-            xdmaDevFileOps.release = xdma_dev_release;
+	/* The following code is for registering as a character device driver.
+	 * The GUI will use /dev/xdma_state file to read state & statistics.
+	 * Incase of any failure, the driver will come up without device
+	 * file support, but statistics will still be visible in the system log.
+	 */
+	/* First allocate a major/minor number. */
+	chrRet = alloc_chrdev_region(&xdmaDev, 0, 1, "xdma_stats");
+	if(IS_ERR((int *)chrRet))
+		printk(KERN_ERR "Error allocating char device region\n");
+	else
+	{
+		/* Register our character device */
+		xdmaCdev = cdev_alloc();
+		if(IS_ERR(xdmaCdev))
+		{
+			printk(KERN_ERR "Alloc error registering device driver\n");
+			unregister_chrdev_region(xdmaDev, 1);
+			chrRet = -1;
+		}
+		else
+		{
+			xdmaDevFileOps.owner = THIS_MODULE;
+			xdmaDevFileOps.open = xdma_dev_open;
+			xdmaDevFileOps.release = xdma_dev_release;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36)
-            xdmaDevFileOps.ioctl = xdma_dev_ioctl;
+			xdmaDevFileOps.ioctl = xdma_dev_ioctl;
 #else
-            xdmaDevFileOps.unlocked_ioctl = xdma_dev_ioctl;
+			xdmaDevFileOps.unlocked_ioctl = xdma_dev_ioctl;
 #endif
-            xdmaCdev->owner = THIS_MODULE;
-            xdmaCdev->ops = &xdmaDevFileOps;
-            xdmaCdev->dev = xdmaDev;
-            chrRet = cdev_add(xdmaCdev, xdmaDev, 1);
-            if(chrRet < 0)
-            {
-                printk(KERN_ERR "Add error registering device driver\n");
-                unregister_chrdev_region(xdmaDev, 1);
-            }
-        }
-    }
-                /* Initialise all stats pointers */
-                for(i=0; i<PS_PCIE_NUM_DMA_CHANNELS; i++)
-                {
-                        dstatsRead[i] = dstatsWrite[i] = dstatsNum[i] = 0;
-                        sstatsRead[i] = sstatsWrite[i] = sstatsNum[i] = 0;
-                        SWrate[i] = 0;
-                }
-                tstatsRead = tstatsWrite = tstatsNum = 0;
+			xdmaCdev->owner = THIS_MODULE;
+			xdmaCdev->ops = &xdmaDevFileOps;
+			xdmaCdev->dev = xdmaDev;
+			chrRet = cdev_add(xdmaCdev, xdmaDev, 1);
+			if(chrRet < 0)
+			{
+				printk(KERN_ERR "Add error registering device driver\n");
+				unregister_chrdev_region(xdmaDev, 1);
+			}
+		}
+	}
+	/* Initialise all stats pointers */
+	for(i=0; i<PS_PCIE_NUM_DMA_CHANNELS; i++)
+	{
+		dstatsRead[i] = dstatsWrite[i] = dstatsNum[i] = 0;
+		sstatsRead[i] = sstatsWrite[i] = sstatsNum[i] = 0;
+		SWrate[i] = 0;
+	}
+	tstatsRead = tstatsWrite = tstatsNum = 0;
 
-                        /* Start stats polling routine */
-                        printk(KERN_INFO "probe: Starting stats poll routine with %x\n",
-                                                                                                pdev);
-                        /* Now start timer */
-                        init_timer(&stats_timer);
-                        stats_timer.expires=jiffies + HZ;
-                        stats_timer.data=(unsigned long) pdev;
-                        stats_timer.function = poll_stats;
-                        add_timer(&stats_timer);
+	/* Start stats polling routine */
+	printk(KERN_INFO "probe: Starting stats poll routine \n");
+	/* Now start timer */
+	init_timer(&stats_timer);
+	stats_timer.expires=jiffies + HZ;
+	stats_timer.data=(unsigned long) pdev;
+	stats_timer.function = poll_stats;
+	add_timer(&stats_timer);
 	printk(KERN_ERR"\nInitialized HOST side diver logic\n");
 
 	//TODO free up resources for each label
-msix_hndlr_registration_failed:
 interrupt_registration_failed:
 err_dma:
 err_pci_reg:
@@ -1024,15 +920,15 @@ err_ioremap_ingress_bar:
 static void /*__devexit*/ nwl_dma_remove(struct pci_dev *pdev)
 {
 
-spin_lock_bh(&DmaStatsLock);
-del_timer_sync(&stats_timer);
-spin_unlock_bh(&DmaStatsLock);
+	spin_lock_bh(&DmaStatsLock);
+	del_timer_sync(&stats_timer);
+	spin_unlock_bh(&DmaStatsLock);
 
-if(xdmaCdev != NULL)
-{
-cdev_del(xdmaCdev);
-unregister_chrdev_region(xdmaCdev->dev,1);
-}
+	if(xdmaCdev != NULL)
+	{
+		cdev_del(xdmaCdev);
+		unregister_chrdev_region(xdmaCdev->dev,1);
+	}
 #ifdef USE_MSIX
 	if(g_host_dma_desc.intr_type == MSIX) 
 	{
@@ -1040,24 +936,24 @@ unregister_chrdev_region(xdmaCdev->dev,1);
 
 		{
 			int i;
-            
+
 			for(i = 0; i < NUM_MSIX_VECS; i++) 
 			{
 				/*
-                if(request_irq(ptr_dma_desc_temp->entries[i].vector,
-							   ps_pcie_intr_handler,
-							   0, 
-							   ptr_dma_desc_temp->channels[i].msix_hndlr_name, 
-							   &ptr_dma_desc_temp->channels[i]))
-				{
-					err = XLNX_MSIX_HNDLR_REG_FAIL;
-					goto msix_hndlr_registration_failed;
-				}
-				else
-				{
-					(&ptr_dma_desc_temp->channels[i])->intr_hndlr_registered = true;
-					printk(KERN_ERR"\nMSIx Interrupt handler registered\n");
-				}*/
+				   if(request_irq(ptr_dma_desc_temp->entries[i].vector,
+				   ps_pcie_intr_handler,
+				   0, 
+				   ptr_dma_desc_temp->channels[i].msix_hndlr_name, 
+				   &ptr_dma_desc_temp->channels[i]))
+				   {
+				   err = XLNX_MSIX_HNDLR_REG_FAIL;
+				   goto msix_hndlr_registration_failed;
+				   }
+				   else
+				   {
+				   (&ptr_dma_desc_temp->channels[i])->intr_hndlr_registered = true;
+				   printk(KERN_ERR"\nMSIx Interrupt handler registered\n");
+				   }*/
 				free_irq(g_host_dma_desc.entries[i].vector, &g_host_dma_desc.channels[i]);
 			}
 
@@ -1066,20 +962,20 @@ unregister_chrdev_region(xdmaCdev->dev,1);
 		pci_disable_msix(pdev);
 	}
 	else
-	if(g_host_dma_desc.intr_type == MSI) 
-	{
-		printk(KERN_ERR"\nUnregister MSI` interrupt handler\n");
-		free_irq(pdev->irq, &g_host_dma_desc); //Todo need to change for multiple card support with linked list
-		pci_disable_msi(pdev);
-		g_host_dma_desc.intr_hndlr_registered = false;
-	}
-	else
-	if(g_host_dma_desc.intr_type == HW) 
-	{
-		printk(KERN_ERR"\nUnregister Legacy interrupt handler\n");
-		free_irq(pdev->irq, &g_host_dma_desc); //Todo need to change for multiple card support with linked list
-		g_host_dma_desc.intr_hndlr_registered = false;
-	}
+		if(g_host_dma_desc.intr_type == MSI) 
+		{
+			printk(KERN_ERR"\nUnregister MSI` interrupt handler\n");
+			free_irq(pdev->irq, &g_host_dma_desc); //Todo need to change for multiple card support with linked list
+			pci_disable_msi(pdev);
+			g_host_dma_desc.intr_hndlr_registered = false;
+		}
+		else
+			if(g_host_dma_desc.intr_type == HW) 
+			{
+				printk(KERN_ERR"\nUnregister Legacy interrupt handler\n");
+				free_irq(pdev->irq, &g_host_dma_desc); //Todo need to change for multiple card support with linked list
+				g_host_dma_desc.intr_hndlr_registered = false;
+			}
 #else
 	if(g_host_dma_desc.intr_hndlr_registered == true) 
 	{
@@ -1111,7 +1007,7 @@ static struct pci_device_id nwl_dma_pci_tbl[] = {
 	{PCI_DEVICE(PCI_VENDOR_XILINX, NWL_DMA_x4G1_PFMON_DEVID)},
 	{PCI_DEVICE(PCI_VENDOR_XILINX, NWL_DMA_HW_SGL_CNTRL)},
 	{PCI_DEVICE(PCI_VENDOR_XILINX, NWL_DMA_HW_SGL_ETHER)},
-    /* required last entry */
+	/* required last entry */
 	{0, }
 };
 //MODULE_DEVICE_TABLE(pci, nwl_dma_pci_tbl);
@@ -1136,16 +1032,16 @@ static struct pci_driver nwl_dma_driver = {
 
 
 /*int xilinx_ps_pcie_dma_driver_init()
-{
-	return 0;
-}*/
+  {
+  return 0;
+  }*/
 
 
 
 /*
-* NWL DMA centric functions
-* These functions abstract the inner register & BD format of NWL DMA
-*/
+ * NWL DMA centric functions
+ * These functions abstract the inner register & BD format of NWL DMA
+ */
 //TODO #warning "Make this funtion inline"
 static /*inline*/ void ps_pcie_post_process_rx_qs(/*ps_pcie_dma_chann_desc_t*/struct work_struct *work/*ptr_chann_desc, enum dma_data_direction dr*/)
 
@@ -1157,8 +1053,8 @@ static /*inline*/ void ps_pcie_post_process_rx_qs(/*ps_pcie_dma_chann_desc_t*/st
 	unsigned short uid;
 	unsigned int compl_bytes = 0;
 	enum dma_data_direction dr;
-	
 	//unsigned long flags;
+
 	u8 __iomem *ptr_chan_dma_reg_vbaddr = ptr_chann_desc->chan_dma_reg_vbaddr;
 
 	if(ptr_chann_desc->dir == IN) 
@@ -1174,50 +1070,11 @@ static /*inline*/ void ps_pcie_post_process_rx_qs(/*ps_pcie_dma_chann_desc_t*/st
 	LOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 	//spin_lock(&ptr_chann_desc->channel_lock);
 
-	/*if(ptr_chann_desc->chann_state == XLNX_DMA_CHANN_IO_QUIESCED) 
-	{
-		spin_unlock_bh(&ptr_chann_desc->channel_lock);
-		return;
-	}*/
-
-#if 1
-	{
-		unsigned int regval;
-		unsigned int offset;
-
-		if(ptr_chann_desc->ptr_dma_desc->pform == EP) 
-		{
-			offset = DMA_AXI_INTR_CNTRL_REG_OFFSET;
-		}
-		else
-		{
-			offset = DMA_PCIE_INTR_CNTRL_REG_OFFSET;
-		}
-#if 0
-		/* Disable interrupts for this channel */
-		regval = RD_DMA_REG(ptr_chan_dma_reg_vbaddr, offset);
-		regval &= 0xfffffffe;
-		WR_DMA_REG(ptr_chan_dma_reg_vbaddr, offset,regval);
-		wmb();
-#endif		
-	}
-#endif
 
 	/* Go through the status q BD elements */
 	ptr_sta_desc = &ptr_chann_desc->ptr_sta_q[ptr_chann_desc->idx_sta_q];
 
-
-#if 0
-	{
-		unsigned int *p = (unsigned int*)ptr_sta_desc;
-		unsigned int val0 = *p;
-		unsigned int val1 = *(p+1);
-		printk(KERN_ERR"\nStatus descriptor %p val0:%x val1:%x\n",p, val0, val1);
-	}
-#endif
-
-	ptr_chann_desc->yield_weight = PKT_YIELD_CNT_PER_CHANN;
-        UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
+	UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 	while(ptr_sta_desc->completed ) 
 	{
 		data_q_cntxt_t *ptr_ctx = NULL;
@@ -1289,7 +1146,7 @@ static /*inline*/ void ps_pcie_post_process_rx_qs(/*ps_pcie_dma_chann_desc_t*/st
 #ifdef DBG_PRNT	
 				printk(KERN_ERR"\nBD %d Unmapping buffer PA %p Size %d\n", tmp_bd_idx,(void*)paddr_buf, sz);
 #endif
-			
+
 
 				if(ptr_ctx->at == VIRT_ADDR) 
 				{
@@ -1301,23 +1158,23 @@ static /*inline*/ void ps_pcie_post_process_rx_qs(/*ps_pcie_dma_chann_desc_t*/st
 				memset(ptr_src_bd, 0, sizeof(ps_pcie_src_bd_t));
 			}
 			else
-			if(dr == DMA_FROM_DEVICE) 
-			{
-				ps_pcie_dst_bd_t *ptr_dst_bd = &ptr_chann_desc->ptr_data_q.ptr_dst_q[tmp_bd_idx];
-				dma_addr_t paddr_buf = (dma_addr_t)ptr_dst_bd->phy_dst_addr;
-				size_t sz = (size_t)ptr_dst_bd->byte_count;
-#ifdef DBG_PRNT	
-				printk(KERN_ERR"\nBD %d Unmapping buffer PA %p Size %d\n", tmp_bd_idx,(void*)paddr_buf, sz);
-#endif
-				if(ptr_ctx->at == VIRT_ADDR)
+				if(dr == DMA_FROM_DEVICE) 
 				{
-					/* Unmap buffer */
-					dma_unmap_single(ptr_chann_desc->ptr_dma_desc->dev, paddr_buf, sz, dr);
-				}
+					ps_pcie_dst_bd_t *ptr_dst_bd = &ptr_chann_desc->ptr_data_q.ptr_dst_q[tmp_bd_idx];
+					dma_addr_t paddr_buf = (dma_addr_t)ptr_dst_bd->phy_dst_addr;
+					size_t sz = (size_t)ptr_dst_bd->byte_count;
+#ifdef DBG_PRNT	
+					printk(KERN_ERR"\nBD %d Unmapping buffer PA %p Size %d\n", tmp_bd_idx,(void*)paddr_buf, sz);
+#endif
+					if(ptr_ctx->at == VIRT_ADDR)
+					{
+						/* Unmap buffer */
+						dma_unmap_single(ptr_chann_desc->ptr_dma_desc->dev, paddr_buf, sz, dr);
+					}
 
-				/* Zero out dst bd element */
-				memset(ptr_dst_bd, 0, sizeof(ps_pcie_dst_bd_t));
-			}
+					/* Zero out dst bd element */
+					memset(ptr_dst_bd, 0, sizeof(ps_pcie_dst_bd_t));
+				}
 
 			num_frags++; //Increment numbr of frags for this packet
 #ifdef DBG_PRNT
@@ -1328,13 +1185,13 @@ static /*inline*/ void ps_pcie_post_process_rx_qs(/*ps_pcie_dma_chann_desc_t*/st
 				break; //We have post processed each fragment
 			}
 
-            /* Increment sop bd index */
+			/* Increment sop bd index */
 			tmp_bd_idx++;
 			if(tmp_bd_idx == ptr_chann_desc->data_q_sz) 
 			{
 				tmp_bd_idx = 0;
 			}
-			
+
 		}while(1);
 
 		/* Increment number of packet io done by channel */
@@ -1348,10 +1205,8 @@ static /*inline*/ void ps_pcie_post_process_rx_qs(/*ps_pcie_dma_chann_desc_t*/st
 #ifdef DBG_PRNT
 			printk(KERN_ERR"\nCBK registered %d\n",ptr_chann_desc->num_pkts_io);
 #endif
-		//	ptr_ctx->cbk(ptr_chann_desc, ptr_ctx->data, compl_bytes, uid, num_frags);
 			cbk = ptr_postps_start_ctx->cbk;
 			data = ptr_postps_start_ctx->data;
-			//cbk(ptr_chann_desc, data, compl_bytes, uid, num_frags);
 		}
 		else
 		{
@@ -1362,8 +1217,8 @@ static /*inline*/ void ps_pcie_post_process_rx_qs(/*ps_pcie_dma_chann_desc_t*/st
 #endif
 
 		/*
-		* Release the context element that correspond to the BD(s) that conatin the packet that was received
-        */
+		 * Release the context element that correspond to the BD(s) that conatin the packet that was received
+		 */
 		do
 		{
 			bool done = false;
@@ -1398,7 +1253,7 @@ static /*inline*/ void ps_pcie_post_process_rx_qs(/*ps_pcie_dma_chann_desc_t*/st
 				break;
 			}
 		}while(1);
-		
+
 
 		/* Increment status q index */
 		ptr_chann_desc->idx_sta_q++;
@@ -1422,7 +1277,7 @@ static /*inline*/ void ps_pcie_post_process_rx_qs(/*ps_pcie_dma_chann_desc_t*/st
 		/* Zero out the status descriptor element */
 		memset(ptr_sta_desc, 0, sizeof(ps_pcie_sta_desc_t));
 
-        /* Get pointer to next status descriptor */
+		/* Get pointer to next status descriptor */
 		ptr_sta_desc = &ptr_chann_desc->ptr_sta_q[ptr_chann_desc->idx_sta_q];
 #ifdef DBG_PRNT
 		printk(KERN_ERR"\nStatus Q next BD to check index %d\n",ptr_chann_desc->idx_sta_q);
@@ -1438,61 +1293,33 @@ static /*inline*/ void ps_pcie_post_process_rx_qs(/*ps_pcie_dma_chann_desc_t*/st
 		{
 			offset = DMA_DSTAQLMT_REG_OFFSET;
 		}
-#if 1
 		/* Increment status Q limit to index next status Q BD to use */
 		WR_DMA_REG(ptr_chan_dma_reg_vbaddr, offset, ptr_chann_desc->idx_sta_q_hw);
 		wmb();
-#endif
-#if 0
-		{
-			unsigned int data = 0;
-
-			rmb();
-			data = RD_DMA_REG(ptr_chan_dma_reg_vbaddr, offset);
-			printk(KERN_ERR"\n Status Q Limit %d", data);
-
-		}
-#endif
-#if 1
 		/*
-		* We now have some BDs & context free
-        */
+		 * We now have some BDs & context free
+		 */
 		if( ptr_chann_desc->chann_state == XLNX_DMA_CNTXTQ_SATURATED ||
-		   ptr_chann_desc->chann_state == XLNX_DMA_CHANN_SATURATED ) 
+				ptr_chann_desc->chann_state == XLNX_DMA_CHANN_SATURATED ) 
 		{
 			ptr_chann_desc->chann_state = XLNX_DMA_CHANN_NO_ERR;
 		}
-		
+
 
 		if(cbk != NULL /*&& ptr_chann_desc->chann_state != XLNX_DMA_CHANN_IO_QUIESCED*/) 
 		{
 			/* Fire callback */
 			cbk(ptr_chann_desc, data, compl_bytes, uid, num_frags);
 		}
-#endif
-#if 0
-		wmb();
-		/* Increment status Q limit to index next status Q BD to use */
-		WR_DMA_REG(ptr_chan_dma_reg_vbaddr, offset, ptr_chann_desc->idx_sta_q_hw);
-#endif
 
 
-		//break; //Temporary
 		ptr_chann_desc->yield_weight--;
-	UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
+		UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 
 	}
 
-#if 0
-	if(dbg_flag) 
-	{
-		/* No BDs complete why did interrupt occur */
-		printk(KERN_ERR"\nUnknown reason for SGL interrupt \n");
-	}
-#endif
-LOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
+	LOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 
-#if 1
 	{
 		unsigned int regval;
 		unsigned int offset;
@@ -1506,7 +1333,7 @@ LOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 			offset = DMA_PCIE_INTR_CNTRL_REG_OFFSET;
 		}
 
-	
+
 
 		rmb();
 		/* Enable interrupts for this channel */
@@ -1514,11 +1341,10 @@ LOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 		regval |= DMA_INTCNTRL_ENABLINTR_BIT;
 		WR_DMA_REG(ptr_chan_dma_reg_vbaddr, offset,regval);
 	}
-#endif
 	//spin_unlock_irqrestore(&ptr_chann_desc->channel_lock, flags);
 	UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock/*, flags*/);
 	//spin_unlock(&ptr_chann_desc->channel_lock/*, flags*/);
-	
+
 }
 
 static /*inline*/ void ps_pcie_post_process_tx_qs(/*ps_pcie_dma_chann_desc_t*/struct work_struct *work/*ptr_chann_desc, enum dma_data_direction dr*/)
@@ -1534,6 +1360,8 @@ static /*inline*/ void ps_pcie_post_process_tx_qs(/*ps_pcie_dma_chann_desc_t*/st
 	unsigned int num_frags_all = 0;
 	void *data_all = NULL;
 	//unsigned long flags;
+	unsigned int regval;
+	unsigned int offset;
 	u8 __iomem *ptr_chan_dma_reg_vbaddr = ptr_chann_desc->chan_dma_reg_vbaddr;
 
 	if(ptr_chann_desc->dir == IN) 
@@ -1549,51 +1377,12 @@ static /*inline*/ void ps_pcie_post_process_tx_qs(/*ps_pcie_dma_chann_desc_t*/st
 	LOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 	//spin_lock(&ptr_chann_desc->channel_lock);
 
-	/*if(ptr_chann_desc->chann_state == XLNX_DMA_CHANN_IO_QUIESCED) 
-	{
-		spin_unlock_bh(&ptr_chann_desc->channel_lock);
-		return;
-	}*/
-#if 0
-	{
-		unsigned int regval;
-		unsigned int offset;
-
-		if(ptr_chann_desc->ptr_dma_desc->pform == EP) 
-		{
-			offset = DMA_AXI_INTR_CNTRL_REG_OFFSET;
-		}
-		else
-		{
-			offset = DMA_PCIE_INTR_CNTRL_REG_OFFSET;
-		}
-
-		/* Disable interrupts for this channel */
-		regval = RD_DMA_REG(ptr_chan_dma_reg_vbaddr, offset);
-		regval &= 0xfffffffe;
-		WR_DMA_REG(ptr_chan_dma_reg_vbaddr, offset,regval);
-		wmb();
-	}
-#endif
-
-	
-
 	/* Go through the status q BD elements */
 	ptr_sta_desc = &ptr_chann_desc->ptr_sta_q[ptr_chann_desc->idx_sta_q];
 
-
-#if 0
-	{
-		unsigned int *p = (unsigned int*)ptr_sta_desc;
-		unsigned int val0 = *p;
-		unsigned int val1 = *(p+1);
-		printk(KERN_ERR"\nStatus descriptor %p val0:%x val1:%x\n",p, val0, val1);
-	}
-#endif
 	ptr_chann_desc->yield_weight = PKT_YIELD_CNT_PER_CHANN;
-UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
+	UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 
-//	while(ptr_sta_desc->completed && ptr_chann_desc->yield_weight) 
 	while(ptr_sta_desc->completed ) 
 	{
 		data_q_cntxt_t *ptr_ctx = NULL;
@@ -1604,11 +1393,11 @@ UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 		void *data = NULL;
 		func_ptr_dma_chann_cbk_noblock cbk;
 
-		  LOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
+		LOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 #ifdef DBG_PRNT
 		printk(KERN_ERR"\nStatus Q BD element index %d\n",ptr_chann_desc->idx_sta_q);
 #endif
-              
+
 		/* Check for errors */
 		if(ptr_sta_desc->dst_err == 1) 
 		{
@@ -1665,7 +1454,7 @@ UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 #ifdef DBG_PRNT	
 				printk(KERN_ERR"\nBD %d Unmapping buffer PA %p Size %d\n", tmp_bd_idx,(void*)paddr_buf, sz);
 #endif
-			
+
 
 				if(ptr_ctx->at == VIRT_ADDR) 
 				{
@@ -1677,24 +1466,24 @@ UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 				memset(ptr_src_bd, 0, sizeof(ps_pcie_src_bd_t));
 			}
 			else
-			if(dr == DMA_FROM_DEVICE) 
-			{
-				ps_pcie_dst_bd_t *ptr_dst_bd = &ptr_chann_desc->ptr_data_q.ptr_dst_q[tmp_bd_idx];
-				dma_addr_t paddr_buf = (dma_addr_t)ptr_dst_bd->phy_dst_addr;
-				size_t sz = (size_t)ptr_dst_bd->byte_count;
-#ifdef DBG_PRNT	
-				printk(KERN_ERR"\nBD %d Unmapping buffer PA %p Size %d\n", tmp_bd_idx,(void*)paddr_buf, sz);
-#endif
-			
-				if(ptr_ctx->at == VIRT_ADDR)
+				if(dr == DMA_FROM_DEVICE) 
 				{
-					/* Unmap buffer */
-					dma_unmap_single(ptr_chann_desc->ptr_dma_desc->dev, paddr_buf, sz, dr);
-				}
+					ps_pcie_dst_bd_t *ptr_dst_bd = &ptr_chann_desc->ptr_data_q.ptr_dst_q[tmp_bd_idx];
+					dma_addr_t paddr_buf = (dma_addr_t)ptr_dst_bd->phy_dst_addr;
+					size_t sz = (size_t)ptr_dst_bd->byte_count;
+#ifdef DBG_PRNT	
+					printk(KERN_ERR"\nBD %d Unmapping buffer PA %p Size %d\n", tmp_bd_idx,(void*)paddr_buf, sz);
+#endif
 
-				/* Zero out dst bd element */
-				memset(ptr_dst_bd, 0, sizeof(ps_pcie_dst_bd_t));
-			}
+					if(ptr_ctx->at == VIRT_ADDR)
+					{
+						/* Unmap buffer */
+						dma_unmap_single(ptr_chann_desc->ptr_dma_desc->dev, paddr_buf, sz, dr);
+					}
+
+					/* Zero out dst bd element */
+					memset(ptr_dst_bd, 0, sizeof(ps_pcie_dst_bd_t));
+				}
 
 			num_frags++; //Increment numbr of frags for this packet
 #ifdef DBG_PRNT
@@ -1706,13 +1495,13 @@ UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 				break; //We have post processed each fragment
 			}
 
-            /* Increment sop bd index */
+			/* Increment sop bd index */
 			tmp_bd_idx++;
 			if(tmp_bd_idx == ptr_chann_desc->data_q_sz) 
 			{
 				tmp_bd_idx = 0;
 			}
-			
+
 		}while(1);
 
 		/* Increment number of packet io done by channel */
@@ -1726,12 +1515,11 @@ UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 #ifdef DBG_PRNT
 			printk(KERN_ERR"\nCBK registered\n");
 #endif
-		//	ptr_ctx->cbk(ptr_chann_desc, ptr_ctx->data, compl_bytes, uid, num_frags);
 			cbk = ptr_ctx->cbk;
 			data = ptr_ctx->data;
 			cbk_all = ptr_ctx->cbk;
 			data_all = ptr_ctx->data;
-			
+
 		}
 		else
 		{
@@ -1771,7 +1559,7 @@ UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 		/* Zero out the status descriptor element */
 		memset(ptr_sta_desc, 0, sizeof(ps_pcie_sta_desc_t));
 
-        /* Get pointer to next status descriptor */
+		/* Get pointer to next status descriptor */
 		ptr_sta_desc = &ptr_chann_desc->ptr_sta_q[ptr_chann_desc->idx_sta_q];
 #ifdef DBG_PRNT
 		printk(KERN_ERR"\nStatus Q next BD to check index %d\n",ptr_chann_desc->idx_sta_q);
@@ -1794,10 +1582,10 @@ UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 		wmb();
 
 		/*
-		* We now have some BDs & context free
-        */
+		 * We now have some BDs & context free
+		 */
 		if( ptr_chann_desc->chann_state == XLNX_DMA_CNTXTQ_SATURATED ||
-		   ptr_chann_desc->chann_state == XLNX_DMA_CHANN_SATURATED ) 
+				ptr_chann_desc->chann_state == XLNX_DMA_CHANN_SATURATED ) 
 		{
 			ptr_chann_desc->chann_state = XLNX_DMA_CHANN_NO_ERR;
 		}
@@ -1811,47 +1599,34 @@ UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 		//break; //Temporary
 		num_frags_all += num_frags;
 		ptr_chann_desc->yield_weight--;
-	UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);	
+		UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);	
 	}
-#if 0
+#ifdef USE_LATER
 	if(cbk_all != NULL /*&& ptr_chann_desc->chann_state != XLNX_DMA_CHANN_IO_QUIESCED*/) 
-		{
-			/* Fire callback */
-			cbk_all(ptr_chann_desc, data_all, compl_bytes, uid, num_frags_all);
-		}
-#endif
-#if 0
-	if(dbg_flag) 
 	{
-		/* No BDs complete why did interrupt occur */
-		printk(KERN_ERR"\nUnknown reason for SGL interrupt \n");
+		/* Fire callback */
+		cbk_all(ptr_chann_desc, data_all, compl_bytes, uid, num_frags_all);
 	}
 #endif
-LOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
+	LOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 
-#if 1
+
+	if(ptr_chann_desc->ptr_dma_desc->pform == EP) 
 	{
-		unsigned int regval;
-		unsigned int offset;
-
-		if(ptr_chann_desc->ptr_dma_desc->pform == EP) 
-		{
-			offset = DMA_AXI_INTR_CNTRL_REG_OFFSET;
-		}
-		else
-		{
-			offset = DMA_PCIE_INTR_CNTRL_REG_OFFSET;
-		}
-
-	
-
-		rmb();
-		/* Enable interrupts for this channel */
-		regval = RD_DMA_REG(ptr_chan_dma_reg_vbaddr, offset);
-		regval |= DMA_INTCNTRL_ENABLINTR_BIT;
-		WR_DMA_REG(ptr_chan_dma_reg_vbaddr, offset,regval);
+		offset = DMA_AXI_INTR_CNTRL_REG_OFFSET;
 	}
-#endif
+	else
+	{
+		offset = DMA_PCIE_INTR_CNTRL_REG_OFFSET;
+	}
+
+
+
+	rmb();
+	/* Enable interrupts for this channel */
+	regval = RD_DMA_REG(ptr_chan_dma_reg_vbaddr, offset);
+	regval |= DMA_INTCNTRL_ENABLINTR_BIT;
+	WR_DMA_REG(ptr_chan_dma_reg_vbaddr, offset,regval);
 
 
 	//spin_unlock_irqrestore(&ptr_chann_desc->channel_lock, flags);
@@ -1867,18 +1642,19 @@ static inline void ps_pcie_chann_intr_handlr(ps_pcie_dma_chann_desc_t *ptr_chann
 	volatile unsigned int regval = intval;
 	unsigned int val;
 
-	
-        val= RD_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_PCIE_INTR_CNTRL_REG_OFFSET);
-		val &= 0xfffffffe;
+	/* Disable all the interrupts and move to polled context 
+	*/	
+	val= RD_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_PCIE_INTR_CNTRL_REG_OFFSET);
+	val &= 0xfffffffe;
 	WR_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_PCIE_INTR_CNTRL_REG_OFFSET,val);
 
-	
-	
+
+
 	do
 	{
 
 		/* Clear the interrupt as we have cached the interrupt status */
-        WR_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, offset, regval);
+		WR_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, offset, regval);
 
 		wmb();
 
@@ -1895,29 +1671,29 @@ static inline void ps_pcie_chann_intr_handlr(ps_pcie_dma_chann_desc_t *ptr_chann
 			{
 				queue_work_on(1,ptr_chann_desc->intr_handlr_wq, &ptr_chann_desc->intrh_work);
 				queue_work_on(2,ptr_chann_desc->ptr_dma_desc->aux_channels[ptr_chann_desc->chann_id].intr_handlr_wq, 
-					   &(ptr_chann_desc->ptr_dma_desc->aux_channels[ptr_chann_desc->chann_id].intrh_work));
+						&(ptr_chann_desc->ptr_dma_desc->aux_channels[ptr_chann_desc->chann_id].intrh_work));
 			}
 			else
 			{
 				queue_work_on(3,ptr_chann_desc->intr_handlr_wq, &ptr_chann_desc->intrh_work);
 				queue_work_on(4,ptr_chann_desc->ptr_dma_desc->aux_channels[ptr_chann_desc->chann_id].intr_handlr_wq, 
-					   &(ptr_chann_desc->ptr_dma_desc->aux_channels[ptr_chann_desc->chann_id].intrh_work));
+						&(ptr_chann_desc->ptr_dma_desc->aux_channels[ptr_chann_desc->chann_id].intrh_work));
 			}
 #else
 			queue_work/*_on*/(/*1,*/ptr_chann_desc->intr_handlr_wq, &ptr_chann_desc->intrh_work);
 #ifdef PFORM_USCALE_NO_EP_PROCESSOR
 			queue_work/*_on*/(/*2,*/ptr_chann_desc->ptr_dma_desc->aux_channels[ptr_chann_desc->chann_id].intr_handlr_wq, 
-					   &(ptr_chann_desc->ptr_dma_desc->aux_channels[ptr_chann_desc->chann_id].intrh_work));
+					&(ptr_chann_desc->ptr_dma_desc->aux_channels[ptr_chann_desc->chann_id].intrh_work));
 #endif
 #endif
 
-			
+
 		}
 
 		if(regval & DMA_INTSTATUS_SWINTR_BIT) 
 		{
 			/* SW interrupt occured */
-#if 0//def DBG_PRNT
+#ifdef DBG_PRNT
 			printk(KERN_ERR"\nSW interrupt occurred \n");
 #endif
 			if(ptr_chann_desc->scrtch_pad_io_in_progress == true) 
@@ -1927,45 +1703,40 @@ static inline void ps_pcie_chann_intr_handlr(ps_pcie_dma_chann_desc_t *ptr_chann
 				ptr_chann_desc->scrtch_pad_io_in_progress = false;
 			}
 #if defined(VIDEO_ACC_DESIGN)
-		    /* Received a user application command */
-		if(ptr_chann_desc->dbell_cbk) {
-//		printk(KERN_ERR "Triggering Callback !!!!!\n");
+			/* Received a user application command */
+			if(ptr_chann_desc->dbell_cbk) {
 				unsigned int command = *((unsigned int*)(ptr_chann_desc->chan_dma_reg_vbaddr + DMA_SCRATCH0_REG_OFFSET));
-				#if 0
-				printk(KERN_ERR"\nFor channel %d Scratch pad Pointer %p Command %x Rx\n",
-					   ptr_chann_desc->chann_id,((unsigned int*)(ptr_chann_desc->chan_dma_reg_vbaddr + DMA_SCRATCH0_REG_OFFSET)),
-					   command);
-				#endif
-		ptr_chann_desc->dbell_cbk(ptr_chann_desc,(unsigned int*)(ptr_chann_desc->chan_dma_reg_vbaddr + DMA_SCRATCH0_REG_OFFSET),DMA_NUM_SCRPAD_REGS);
-		}
-		else
-		{
-			ps_pcie_dma_chann_desc_t *ptr_aux_chann = &(ptr_chann_desc->ptr_dma_desc->aux_channels[ptr_chann_desc->chann_id]);
-			//printk(KERN_ERR"\nDesc pointer for cbk %p\n",ptr_aux_chann);
-		
-			if(ptr_aux_chann->dbell_cbk) {
-				//printk(KERN_ERR "Triggering AUX Callback !!!!!\n");
-				//ptr_aux_chann->dbell_cbk(ptr_chann_desc,(unsigned int*)(ptr_chann_desc->chan_dma_reg_vbaddr + DMA_SCRATCH0_REG_OFFSET),DMA_NUM_SCRPAD_REGS);
+				log_normal(KERN_ERR"\nFor channel %d Scratch pad Pointer %p Command %x Rx\n",
+						ptr_chann_desc->chann_id,((unsigned int*)(ptr_chann_desc->chan_dma_reg_vbaddr + DMA_SCRATCH0_REG_OFFSET)),
+						command);
+				ptr_chann_desc->dbell_cbk(ptr_chann_desc,(unsigned int*)(ptr_chann_desc->chan_dma_reg_vbaddr + DMA_SCRATCH0_REG_OFFSET),DMA_NUM_SCRPAD_REGS);
+			}
+			else
+			{
+				ps_pcie_dma_chann_desc_t *ptr_aux_chann = &(ptr_chann_desc->ptr_dma_desc->aux_channels[ptr_chann_desc->chann_id]);
+
+				if(ptr_aux_chann->dbell_cbk) {
+					//printk(KERN_ERR "Triggering AUX Callback !!!!!\n");
+					//ptr_aux_chann->dbell_cbk(ptr_chann_desc,(unsigned int*)(ptr_chann_desc->chan_dma_reg_vbaddr + DMA_SCRATCH0_REG_OFFSET),DMA_NUM_SCRPAD_REGS);
+
+				}
+
+
 
 			}
-
-
-	
-		}
 #endif
 		}
 
 		rmb();
 
 		regval = RD_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, offset);
-		//WR_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, offset, regval);
 	}while(regval);
 
 	/* Enable coalesce count timer */
 	if(ptr_chann_desc->coalse_cnt_set == true /*&& timer_pending(&ptr_chann_desc->coal_cnt_timer) == false*/) 
 	{
 		ptr_chann_desc->coal_cnt_timer.expires = jiffies + COALESCE_TIMER_MAGNITUDE;
-        add_timer(&ptr_chann_desc->coal_cnt_timer);
+		add_timer(&ptr_chann_desc->coal_cnt_timer);
 	}
 }
 
@@ -1975,10 +1746,10 @@ void coalesce_cnt_bd_process_tmr(unsigned long arg)
 
 	printk(KERN_ERR"\nCoalesce count triggered for channel %d\n",ptr_chann_desc->chann_id);
 
-			queue_work_on(1,ptr_chann_desc->intr_handlr_wq, &ptr_chann_desc->intrh_work);
+	queue_work_on(1,ptr_chann_desc->intr_handlr_wq, &ptr_chann_desc->intrh_work);
 #ifdef PFORM_USCALE_NO_EP_PROCESSOR
-			queue_work_on(2,ptr_chann_desc->ptr_dma_desc->aux_channels[ptr_chann_desc->chann_id].intr_handlr_wq, 
-					   &(ptr_chann_desc->ptr_dma_desc->aux_channels[ptr_chann_desc->chann_id].intrh_work));
+	queue_work_on(2,ptr_chann_desc->ptr_dma_desc->aux_channels[ptr_chann_desc->chann_id].intr_handlr_wq, 
+			&(ptr_chann_desc->ptr_dma_desc->aux_channels[ptr_chann_desc->chann_id].intrh_work));
 #endif
 
 	//add_timer(&ptr_chann_desc->coal_cnt_timer);
@@ -1992,7 +1763,6 @@ static void poll_intr_hndlr_fn(unsigned long data)
 	ps_pcie_dma_desc_t *ptr_dma_desc = (ps_pcie_dma_desc_t *)data;
 	ps_pcie_dma_chann_desc_t *ptr_temp_chann_desc = NULL;
 
-//	printk(KERN_ERR"\nInterrupt handler invoked %p\n", ptr_dma_desc);
 
 	if(ptr_dma_desc->pform == EP) 
 	{
@@ -2024,40 +1794,15 @@ static void poll_intr_hndlr_fn(unsigned long data)
 			regval = 4;
 		}
 
-#if 0
-		mb();
-		WR_DMA_REG(ptr_temp_chann_desc->chan_dma_reg_vbaddr, offset, regval);
-		mb();
-#endif
 		if(regval) 
 		{
 			unsigned int intr_cntrl_reg = 0;
 
-			//printk(KERN_ERR"\nInterrupt status %x Channel %d\n", regval, i);
-#if 0
-			if(1/*ptr_dma_desc->pform == EP*/) 
-			{
-				intr_cntrl_reg = RD_DMA_REG(ptr_temp_chann_desc->chan_dma_reg_vbaddr, offset1);
-				intr_cntrl_reg &= ~(0x1);
-				WR_DMA_REG(ptr_temp_chann_desc->chan_dma_reg_vbaddr, offset1, intr_cntrl_reg);
-
-			}
-#endif
 			ps_pcie_chann_intr_handlr(ptr_temp_chann_desc, regval, offset);
-#if 0
-			if(/*ptr_dma_desc->pform == EP*/1) 
-			{
-				intr_cntrl_reg = RD_DMA_REG(ptr_temp_chann_desc->chan_dma_reg_vbaddr, offset1);
-				intr_cntrl_reg |= DMA_INTCNTRL_ENABLINTR_BIT;
-				WR_DMA_REG(ptr_temp_chann_desc->chan_dma_reg_vbaddr, offset1, intr_cntrl_reg);
-			}
-#endif
 
-			//WR_DMA_REG(ptr_temp_chann_desc->chan_dma_reg_vbaddr, offset, regval);
 		}
 	}
 
-    //printk(KERN_ERR"\nInterrupt handled\n");
 
 	/* Reschedule */
 	ptr_dma_desc->intr_poll_tmr.expires = jiffies + 1; /* parameter */
@@ -2077,7 +1822,7 @@ static irqreturn_t ps_pcie_intr_handler(int irq, void *data)
 	ps_pcie_dma_chann_desc_t *ptr_temp_chann_desc = (ps_pcie_dma_chann_desc_t*)data;
 	ps_pcie_dma_desc_t *ptr_dma_desc = ptr_temp_chann_desc->ptr_dma_desc;
 #endif
-	
+
 #ifdef PFORM_USCALE_NO_EP_PROCESSOR
 	ps_pcie_dma_chann_desc_t *ptr_temp_aux_chann_desc = NULL;
 #endif
@@ -2114,9 +1859,9 @@ static irqreturn_t ps_pcie_intr_handler(int irq, void *data)
 #ifndef USE_MSIX
 		if(ptr_temp_chann_desc->channel_is_active == false
 #ifdef PFORM_USCALE_NO_EP_PROCESSOR
-		   || ptr_temp_aux_chann_desc->channel_is_active == false
+				|| ptr_temp_aux_chann_desc->channel_is_active == false
 #endif
-		   ) 
+		  ) 
 		{
 			continue;
 		}
@@ -2126,17 +1871,17 @@ static irqreturn_t ps_pcie_intr_handler(int irq, void *data)
 		regval = RD_DMA_REG(ptr_temp_chann_desc->chan_dma_reg_vbaddr, offset);
 		if(regval) 
 		{
-		//	unsigned int intr_cntrl_reg = 0;
+			//	unsigned int intr_cntrl_reg = 0;
 #ifdef DBG_PRNT
 			printk(KERN_ERR"\nInterrupt status %x Channel %d\n", regval, ptr_temp_chann_desc->chann_id);
 #endif
 #ifdef TEST_DBG_ON
-		ptr_temp_chann_desc->interrupted = 1;	
+			ptr_temp_chann_desc->interrupted = 1;	
 #endif
-		
 
-        //printk(KERN_ERR"\nIntr Norm channel\n");
-		ps_pcie_chann_intr_handlr(ptr_temp_chann_desc, regval, offset);
+
+			//printk(KERN_ERR"\nIntr Norm channel\n");
+			ps_pcie_chann_intr_handlr(ptr_temp_chann_desc, regval, offset);
 
 			//WR_DMA_REG(ptr_temp_chann_desc->chan_dma_reg_vbaddr, offset, regval);
 		}
@@ -2146,7 +1891,7 @@ static irqreturn_t ps_pcie_intr_handler(int irq, void *data)
 #ifdef DBG_PRNT
 	printk(KERN_ERR"\nInterrupt handled\n");
 #endif
-	
+
 	return retval;
 }
 
@@ -2159,7 +1904,7 @@ static irqreturn_t ps_pcie_intr_handler_no_msix(int irq, void *data)
 	unsigned int offset, offset1;
 	ps_pcie_dma_chann_desc_t *ptr_temp_chann_desc = NULL;
 	ps_pcie_dma_desc_t *ptr_dma_desc = (ps_pcie_dma_desc_t *)data;
-	
+
 #ifdef PFORM_USCALE_NO_EP_PROCESSOR
 	ps_pcie_dma_chann_desc_t *ptr_temp_aux_chann_desc = NULL;
 #endif
@@ -2189,9 +1934,9 @@ static irqreturn_t ps_pcie_intr_handler_no_msix(int irq, void *data)
 
 		if(ptr_temp_chann_desc->channel_is_active == false
 #ifdef PFORM_USCALE_NO_EP_PROCESSOR
-		   || ptr_temp_aux_chann_desc->channel_is_active == false
+				|| ptr_temp_aux_chann_desc->channel_is_active == false
 #endif
-		   ) 
+		  ) 
 		{
 			continue;
 		}
@@ -2201,19 +1946,17 @@ static irqreturn_t ps_pcie_intr_handler_no_msix(int irq, void *data)
 		regval = RD_DMA_REG(ptr_temp_chann_desc->chan_dma_reg_vbaddr, offset);
 		if(regval) 
 		{
-		//	unsigned int intr_cntrl_reg = 0;
+			//	unsigned int intr_cntrl_reg = 0;
 #ifdef DBG_PRNT
 			printk(KERN_ERR"\nInterrupt status %x Channel %d\n", regval, ptr_temp_chann_desc->chann_id);
 #endif
 #ifdef TEST_DBG_ON
-		ptr_temp_chann_desc->interrupted = 1;	
+			ptr_temp_chann_desc->interrupted = 1;	
 #endif
-		
 
-        //printk(KERN_ERR"\nIntr Norm channel\n");
-		ps_pcie_chann_intr_handlr(ptr_temp_chann_desc, regval, offset);
 
-			//WR_DMA_REG(ptr_temp_chann_desc->chan_dma_reg_vbaddr, offset, regval);
+			ps_pcie_chann_intr_handlr(ptr_temp_chann_desc, regval, offset);
+
 		}
 	}
 
@@ -2221,7 +1964,7 @@ static irqreturn_t ps_pcie_intr_handler_no_msix(int irq, void *data)
 #ifdef DBG_PRNT
 	printk(KERN_ERR"\nInterrupt handled\n");
 #endif
-	
+
 	return retval;
 }
 #endif
@@ -2230,8 +1973,8 @@ static irqreturn_t ps_pcie_intr_handler_no_msix(int irq, void *data)
 
 
 /*
-* Interfaces exported
-*/
+ * Interfaces exported
+ */
 ps_pcie_dma_desc_t* xlnx_get_pform_dma_desc(void *prev_desc, unsigned short vendid, unsigned short devid)
 {
 	return &g_host_dma_desc; //This will involve walking a list to support multiple EPs
@@ -2241,7 +1984,7 @@ EXPORT_SYMBOL(xlnx_get_pform_dma_desc);
 
 int xlnx_get_dma(void *dev, platform_t pform, ps_pcie_dma_desc_t **pptr_dma_desc)
 {
-	int rc;
+	//	int rc;
 	ps_pcie_dma_desc_t *ptr_temp_dma_desc = NULL;
 	int retval = XLNX_SUCCESS;
 
@@ -2252,16 +1995,16 @@ int xlnx_get_dma(void *dev, platform_t pform, ps_pcie_dma_desc_t **pptr_dma_desc
 	//pptr_dma_desc->num_channels_active = PS_PCIE_NUM_DMA_CHANNELS; //TODO . This has to come from doorbell register
 	*pptr_dma_desc = &g_host_dma_desc; //TODO this has to come after linked list walk when multiple EP will be supported
 	g_host_dma_desc.dev = &pdev->dev;
-	
+
 	ptr_temp_dma_desc = *pptr_dma_desc;
 
-	
+
 #if 0//ndef POLL_MODE
 	/* Register interrupt handler if not already done */
 	if(ptr_temp_dma_desc->intr_hndlr_registered == false) 
 	{
 		rc = request_irq(ptr_temp_dma_desc->irq_no, ps_pcie_intr_handler, IRQF_SHARED,
-			"PS PCIe DMA Device", ptr_temp_dma_desc);
+				"PS PCIe DMA Device", ptr_temp_dma_desc);
 		if (rc) {
 			printk(KERN_ERR"\nUnable to request IRQ %p, error %d\n",
 					ptr_temp_dma_desc->device, rc);
@@ -2289,19 +2032,19 @@ EXPORT_SYMBOL(xlnx_release_dma);
 
 
 int xlnx_get_dma_channel(ps_pcie_dma_desc_t *ptr_dma_desc, u32 channel_id, 
-						 direction_t dir, ps_pcie_dma_chann_desc_t **pptr_chann_desc,
-						 func_ptr_chann_health_cbk_no_block ptr_chann_health)
+		direction_t dir, ps_pcie_dma_chann_desc_t **pptr_chann_desc,
+		func_ptr_chann_health_cbk_no_block ptr_chann_health)
 {
 	int retval = XLNX_SUCCESS;
 	unsigned long flags;
 	ps_pcie_dma_chann_desc_t *p_temp_chan = NULL;
-	
+
 
 	printk(KERN_ERR"\nDMA get channel\n");
 
 	spin_lock_irqsave(&ptr_dma_desc->dma_lock, flags);
 
-    /* Perform sanity checks on parameters */
+	/* Perform sanity checks on parameters */
 	if(ptr_dma_desc->num_channels_active == 0 || ptr_dma_desc->num_channels_alloc == ptr_dma_desc->num_channels_active) 
 	{
 		/* All channels allocated */
@@ -2318,7 +2061,7 @@ int xlnx_get_dma_channel(ps_pcie_dma_desc_t *ptr_dma_desc, u32 channel_id,
 
 	/* Get pointer to channel descriptor */
 	p_temp_chan = &(ptr_dma_desc->channels[channel_id]);
-	
+
 
 	/* Check if channel already allocated. */
 	if(p_temp_chan->channel_is_active == true) 
@@ -2344,19 +2087,13 @@ int xlnx_get_dma_channel(ps_pcie_dma_desc_t *ptr_dma_desc, u32 channel_id,
 	{
 		p_temp_chan->ptr_func_health = ptr_chann_health;
 
-        /* check if this channel is allocated in EP and direction is consistent */
+		/* check if this channel is allocated in EP and direction is consistent */
 		retval = nwl_dma_is_chann_alloc_ep(ptr_dma_desc, channel_id, dir);
 		if(retval < XLNX_SUCCESS)
 		{
 			printk(KERN_ERR"\nChannel not allocated in EP as neded %d\n", retval);
-            goto error;
+			goto error;
 		}
-
-		
-#if 0 //TODO communicate to EP that channel is latched
-		/* inform EP that the channel is now latched */
-		nwl_dma_inform_ep_chann_latched(ptr_dma_desc, channel_id);
-#endif
 
 		/* Latch channel */
 		p_temp_chan->latched = true;
@@ -2380,18 +2117,9 @@ int xlnx_get_dma_channel(ps_pcie_dma_desc_t *ptr_dma_desc, u32 channel_id,
 	p_temp_chan->chk_hbeat = true;
 	/* Increment number of channel allocated */
 	ptr_dma_desc->num_channels_alloc++;
-	
+
 error:
 	spin_unlock_irqrestore(&ptr_dma_desc->dma_lock,flags);
-#if 0
-	if(!p_temp_chan->hbeat_thrd)
-	{
-		/* Spawn a thread to keep checking heart beat */
-		sprintf(p_temp_chan->hbeat_thrd_name,"Chann%d NWL DMA Hbeat thread", p_temp_chan->chann_id);
-		p_temp_chan->hbeat_thrd = kthread_run(&heart_beat_function,(void *)p_temp_chan,
-											  p_temp_chan->hbeat_thrd_name);
-	}
-#endif
 	printk(KERN_ERR"\nDMA get channel done %d\n",retval);
 
 	return retval;
@@ -2400,11 +2128,11 @@ error:
 EXPORT_SYMBOL(xlnx_get_dma_channel);
 
 int xlnx_alloc_queues(ps_pcie_dma_chann_desc_t *ptr_chann_desc,
-							  unsigned int *ptr_data_q_addr_hi, //Physical address
-							  unsigned int *ptr_data_q_addr_lo,//Physical address
-                              unsigned int *ptr_sta_q_addr_hi,//Physical address
-							  unsigned int *ptr_sta_q_addr_lo,//Physical address
-							  unsigned int q_num_elements)
+		unsigned int *ptr_data_q_addr_hi, //Physical address
+		unsigned int *ptr_data_q_addr_lo,//Physical address
+		unsigned int *ptr_sta_q_addr_hi,//Physical address
+		unsigned int *ptr_sta_q_addr_lo,//Physical address
+		unsigned int q_num_elements)
 {
 	int retval = XLNX_SUCCESS;
 	unsigned int data_q_elem_sz = sizeof(ps_pcie_dst_bd_t); //Src & Dst BD element have same size
@@ -2412,14 +2140,14 @@ int xlnx_alloc_queues(ps_pcie_dma_chann_desc_t *ptr_chann_desc,
 	dma_addr_t data_q_paddr;
 	dma_addr_t sta_q_paddr;
 	u64 temp_u64 = 0;
-    struct device *dev = ptr_chann_desc->ptr_dma_desc->dev;
+	struct device *dev = ptr_chann_desc->ptr_dma_desc->dev;
 
 	printk(KERN_ERR"\n allocate Qs DMA Channel %d %p %p %p %d %d\n",ptr_chann_desc->chann_id, ptr_chann_desc, dev, ptr_chann_desc->ptr_dma_desc,
-		   data_q_elem_sz,sta_q_elem_sz);
+			data_q_elem_sz,sta_q_elem_sz);
 
-   // spin_lock_irqsave(&ptr_chann_desc->ptr_dma_desc->dma_lock, flags);
+	// spin_lock_irqsave(&ptr_chann_desc->ptr_dma_desc->dma_lock, flags);
 
-    if(ptr_chann_desc->ptr_data_q.ptr_q || ptr_chann_desc->ptr_sta_q) 
+	if(ptr_chann_desc->ptr_data_q.ptr_q || ptr_chann_desc->ptr_sta_q) 
 	{
 		retval = XLNX_Q_ALREADY_ALLOC;
 		goto error_q_already_allocated;
@@ -2427,7 +2155,7 @@ int xlnx_alloc_queues(ps_pcie_dma_chann_desc_t *ptr_chann_desc,
 
 	/* Allocate data Q */
 	ptr_chann_desc->ptr_data_q.ptr_q = dma_zalloc_coherent(dev, data_q_elem_sz * q_num_elements,
-														  &data_q_paddr, GFP_KERNEL );
+			&data_q_paddr, GFP_KERNEL );
 	if(ptr_chann_desc->ptr_data_q.ptr_q == NULL) 
 	{
 		retval = XLNX_DATA_Q_ALLOC_FAIL;
@@ -2442,11 +2170,11 @@ int xlnx_alloc_queues(ps_pcie_dma_chann_desc_t *ptr_chann_desc,
 
 	/* Allocate status Q */
 	ptr_chann_desc->ptr_sta_q = dma_zalloc_coherent(dev, sta_q_elem_sz * q_num_elements,
-														  &sta_q_paddr, GFP_KERNEL );
+			&sta_q_paddr, GFP_KERNEL );
 	if(ptr_chann_desc->ptr_sta_q == NULL) 
 	{
 		retval = XLNX_STA_Q_ALLOC_FAIL;
-			printk(KERN_ERR"\n Sta Q allocation failed !!!!!!!!! ERROR \n");
+		printk(KERN_ERR"\n Sta Q allocation failed !!!!!!!!! ERROR \n");
 		goto error_staq_alloc_fail;
 	}
 	else
@@ -2483,18 +2211,18 @@ int xlnx_alloc_queues(ps_pcie_dma_chann_desc_t *ptr_chann_desc,
 		retval = XLNX_CNTX_ARR_ALLOC_FAIL;
 		goto error_cntxq_alloc_fail;
 	}
-//	ptr_chann_desc->cntxt_q_sz = sizeof(data_q_cntxt_t) * q_num_elements;
+	//	ptr_chann_desc->cntxt_q_sz = sizeof(data_q_cntxt_t) * q_num_elements;
 
 #if 0
 	/* Initialize number of BDs that can be used */
 	if(ptr_chann_desc->dir == IN) 
 	{
 		/*
-		* In case of rx, at start of day we will not preallocate all BDs as this will cause
-		* both next & limit pointers to be 0. This will cause IOs to not start at all.
-		* We will leave last BD empty. Next == 0 & limit == 3 (in cas there are say 4BDs) is what we should look like
-		* at start of day
-        */
+		 * In case of rx, at start of day we will not preallocate all BDs as this will cause
+		 * both next & limit pointers to be 0. This will cause IOs to not start at all.
+		 * We will leave last BD empty. Next == 0 & limit == 3 (in cas there are say 4BDs) is what we should look like
+		 * at start of day
+		 */
 		ptr_chann_desc->num_free_bds = q_num_elements - 1;
 	}
 	else
@@ -2502,9 +2230,9 @@ int xlnx_alloc_queues(ps_pcie_dma_chann_desc_t *ptr_chann_desc,
 		ptr_chann_desc->num_free_bds = q_num_elements;
 	}
 #endif
-    
+
 	printk(KERN_ERR"\n Allocated DataQ Hi: %x DataQ Lo: %x StaQ Hi: %x StaQ Lo %x\n",*ptr_data_q_addr_hi,
-		   *ptr_data_q_addr_lo, *ptr_sta_q_addr_hi, *ptr_sta_q_addr_lo );
+			*ptr_data_q_addr_lo, *ptr_sta_q_addr_hi, *ptr_sta_q_addr_lo );
 
 
 
@@ -2523,27 +2251,27 @@ EXPORT_SYMBOL(xlnx_alloc_queues);
 
 int xlnx_dealloc_queues(ps_pcie_dma_chann_desc_t *ptr_chann_desc)
 {
-	unsigned long flags;
+	//	unsigned long flags;
 	int ret = XLNX_SUCCESS;
 	//TODO  complete this
 	printk(KERN_ERR"\n Deallocate Qs DMA Channel %d %p\n",ptr_chann_desc->chann_id, ptr_chann_desc);
-	
-//	spin_lock_bh(&ptr_chann_desc->channel_lock/*, flags*/);
+
+	//	spin_lock_bh(&ptr_chann_desc->channel_lock/*, flags*/);
 
 	/* Free the context array */
 	kfree(ptr_chann_desc->ptr_ctx);
 
 	/* Free Data Descriptor Q */
 	dma_free_coherent(ptr_chann_desc->ptr_dma_desc->dev,
-					  ptr_chann_desc->dat_q_sz, ptr_chann_desc->ptr_data_q.ptr_q, ptr_chann_desc->data_q_paddr);
+			ptr_chann_desc->dat_q_sz, ptr_chann_desc->ptr_data_q.ptr_q, ptr_chann_desc->data_q_paddr);
 
 	/* Free Status Descriptor Q */
 	dma_free_coherent(ptr_chann_desc->ptr_dma_desc->dev,
-					  ptr_chann_desc->stat_q_sz, ptr_chann_desc->ptr_sta_q, ptr_chann_desc->stat_q_paddr);
+			ptr_chann_desc->stat_q_sz, ptr_chann_desc->ptr_sta_q, ptr_chann_desc->stat_q_paddr);
 
 	ptr_chann_desc->ptr_data_q.ptr_q = ptr_chann_desc->ptr_sta_q = NULL;
 
-//error:
+	//error:
 	//spin_unlock_bh(&ptr_chann_desc->channel_lock/*,flags*/);
 
 	printk(KERN_ERR"\n DMA deallocate queues done %d\n",ret);
@@ -2555,28 +2283,28 @@ EXPORT_SYMBOL(xlnx_dealloc_queues);
 
 
 /* 
-* NOTE: API does not take any lock. It is imperative that 'channel_lock' be taken before calling this API.
-* In case 'xlnx_data_frag_io' needs to be called on this channel post calling this function, it is highly reccomended that 'xlnx_data_frag_io' 
-* be called without relinquishing the channel_lock' that was taken for invoking this API
-*/
+ * NOTE: API does not take any lock. It is imperative that 'channel_lock' be taken before calling this API.
+ * In case 'xlnx_data_frag_io' needs to be called on this channel post calling this function, it is highly reccomended that 'xlnx_data_frag_io' 
+ * be called without relinquishing the channel_lock' that was taken for invoking this API
+ */
 inline unsigned int xlnx_get_chann_num_free_bds(ps_pcie_dma_chann_desc_t *ptr_chan_desc)
 {
-    return 0;//ptr_chan_desc->num_free_bds;
+	return 0;//ptr_chan_desc->num_free_bds;
 }
 EXPORT_SYMBOL(xlnx_get_chann_num_free_bds);
 
 /* 
-* NOTE: This API assumes that the caller has taken the channel lock across succesive calls to the API to transmit
-* data distributed across multiple fragments
-*/
+ * NOTE: This API assumes that the caller has taken the channel lock across succesive calls to the API to transmit
+ * data distributed across multiple fragments
+ */
 inline int xlnx_data_frag_io(ps_pcie_dma_chann_desc_t *ptr_chan_desc, 
-							 unsigned char *addr_buf, 
-							 addr_type_t at,
-							 size_t sz,
-							 func_ptr_dma_chann_cbk_noblock cbk,
-							 unsigned short uid, 
-							 bool last_frag, /*direction_t dir,*/
-							 void *ptr_user_data)
+		unsigned char *addr_buf, 
+		addr_type_t at,
+		size_t sz,
+		func_ptr_dma_chann_cbk_noblock cbk,
+		unsigned short uid, 
+		bool last_frag, /*direction_t dir,*/
+		void *ptr_user_data)
 {
 	int ret = XLNX_SUCCESS;
 	dataq_ptr_t ptr_dq =ptr_chan_desc->ptr_data_q;
@@ -2584,10 +2312,6 @@ inline int xlnx_data_frag_io(ps_pcie_dma_chann_desc_t *ptr_chan_desc,
 	dma_addr_t paddr_buf;
 	enum dma_data_direction dr;
 	unsigned int offset = 0;
-	
-	//unsigned int regval = 0;
-	//bool sat_flag = false;
-	// 
 
 	if(ptr_chan_desc->chann_state == XLNX_DMA_CHANN_IO_QUIESCED) 
 	{
@@ -2604,9 +2328,9 @@ inline int xlnx_data_frag_io(ps_pcie_dma_chann_desc_t *ptr_chan_desc,
 		dr = DMA_FROM_DEVICE;
 
 		/*
-		* We will have a context for each BD allocated. Hence we will mark each fragment in receive direction
-		* as 'last fragment'
-        */
+		 * We will have a context for each BD allocated. Hence we will mark each fragment in receive direction
+		 * as 'last fragment'
+		 */
 		last_frag = true;
 	}
 
@@ -2626,7 +2350,7 @@ inline int xlnx_data_frag_io(ps_pcie_dma_chann_desc_t *ptr_chan_desc,
 
 	if(ptr_chan_desc->chann_state != XLNX_DMA_CHANN_NO_ERR) 
 	{
-//		printk(KERN_ERR"\nDMA channel %d in error state %d\n",ptr_chan_desc->chann_id, ptr_chan_desc->chann_state);
+		log_normal(KERN_ERR"\nDMA channel %d in error state %d\n",ptr_chan_desc->chann_id, ptr_chan_desc->chann_state);
 		ret = XLNX_DMA_CHANN_SW_ERR;
 		goto error_channel;
 	}
@@ -2646,7 +2370,7 @@ inline int xlnx_data_frag_io(ps_pcie_dma_chann_desc_t *ptr_chan_desc,
 	}
 #endif
 
-    if(last_frag == true) 
+	if(last_frag == true) 
 	{
 		/* This is last fragment, we need to find a context */
 		ptr_ctx = &ptr_chan_desc->ptr_ctx[ptr_chan_desc->idx_cntxt_q];
@@ -2657,15 +2381,15 @@ inline int xlnx_data_frag_io(ps_pcie_dma_chann_desc_t *ptr_chan_desc,
 			//printk(KERN_ERR"\nPump next rx frag chann %d\n",ptr_chann->chann_id);
 			ptr_chan_desc->chann_state = XLNX_DMA_CNTXTQ_SATURATED;
 			ptr_chan_desc->saturate_flag = true;
-#if 0//def DBG_PRNT
+#ifdef DBG_PRNT
 			printk(KERN_ERR"\nDMA channel %d in error state %d\n",ptr_chan_desc->chann_id, ptr_chan_desc->chann_state);
 			printk(KERN_ERR"\nContext Q %p Saturated Q element index %d Q element data %x Q element frag src q index %d\n",ptr_ctx, ptr_chan_desc->idx_cntxt_q,
-				   ptr_ctx->data, ptr_ctx->sop_bd_idx);
+					ptr_ctx->data, ptr_ctx->sop_bd_idx);
 #endif
 
 			{
-				
-				
+
+
 #ifdef DBG_PRNT
 				unsigned int i;
 				unsigned char *p = (unsigned char*)ptr_ctx;
@@ -2694,7 +2418,7 @@ inline int xlnx_data_frag_io(ps_pcie_dma_chann_desc_t *ptr_chan_desc,
 		}
 	}
 
-    /* Get ourselves an unused BD element */
+	/* Get ourselves an unused BD element */
 	if( ptr_chan_desc->dir == OUT) 
 	{
 		ps_pcie_src_bd_t *ptr_src_bd = &ptr_dq.ptr_src_q[ptr_chan_desc->unusd_bd_idx_data_q];
@@ -2735,7 +2459,6 @@ inline int xlnx_data_frag_io(ps_pcie_dma_chann_desc_t *ptr_chan_desc,
 			ptr_src_bd->eop = 1;
 			ptr_src_bd->intr = 1; //We want interrupt after status Q is written
 			ptr_src_bd->usr_handle = ptr_chan_desc->idx_cntxt_q;
-#warning  remove -1 and make ptr_src_bd->usr_id = uid below
 			ptr_src_bd->usr_id = uid;
 		}
 	}
@@ -2769,15 +2492,15 @@ inline int xlnx_data_frag_io(ps_pcie_dma_chann_desc_t *ptr_chan_desc,
 			if(at == EP_PHYS_ADDR) 
 			{
 				/* Buffer is on AXI memory */
-      
-			ptr_dst_bd->loc_axi = 1;
+
+				ptr_dst_bd->loc_axi = 1;
 			}
 		}
 #endif
 
 
 		ptr_dst_bd->use_nxt_bd_on_eop = 1;
-        ptr_dst_bd->usr_handle = ptr_chan_desc->idx_cntxt_q;
+		ptr_dst_bd->usr_handle = ptr_chan_desc->idx_cntxt_q;
 		ptr_dst_bd->dma_data_rd_attr = 0x3;
 	}
 
@@ -2827,7 +2550,7 @@ inline int xlnx_data_frag_io(ps_pcie_dma_chann_desc_t *ptr_chan_desc,
 	/* Program the hardware with new Q limit value */
 	WR_DMA_REG(ptr_chan_desc->chan_dma_reg_vbaddr, offset, ptr_chan_desc->unusd_bd_idx_data_q);
 
-//	printk(KERN_ERR"\n New Q limit value %d\n",ptr_chan_desc->unusd_bd_idx_data_q);
+	//	printk(KERN_ERR"\n New Q limit value %d\n",ptr_chan_desc->unusd_bd_idx_data_q);
 	return XLNX_SUCCESS;
 error_channel:
 
@@ -2843,15 +2566,15 @@ error_channel:
 EXPORT_SYMBOL(xlnx_data_frag_io);
 
 int xlnx_activate_dma_channel(ps_pcie_dma_desc_t *ptr_dma_desc, 
-							  ps_pcie_dma_chann_desc_t *ptr_chann_desc,
-							  unsigned int data_q_addr_hi, //Physical address
-							  unsigned int data_q_addr_lo,//Physical address
-							  unsigned int data_q_sz,
-                              unsigned int sta_q_addr_hi,//Physical address
-							  unsigned int sta_q_addr_lo,//Physical address
-							  unsigned int sta_q_sz,
-							  unsigned char coalesce_cnt //Coalesce count for SGL interrupt resporting
-							  )
+		ps_pcie_dma_chann_desc_t *ptr_chann_desc,
+		unsigned int data_q_addr_hi, //Physical address
+		unsigned int data_q_addr_lo,//Physical address
+		unsigned int data_q_sz,
+		unsigned int sta_q_addr_hi,//Physical address
+		unsigned int sta_q_addr_lo,//Physical address
+		unsigned int sta_q_sz,
+		unsigned char coalesce_cnt //Coalesce count for SGL interrupt resporting
+		)
 {
 	int ret = XLNX_SUCCESS;
 	//unsigned long flags;
@@ -2907,8 +2630,8 @@ int xlnx_activate_dma_channel(ps_pcie_dma_desc_t *ptr_dma_desc,
 	}
 
 	/* Initialize scratch pad communication blocking semaphore & serialization MUTEX */
-    sema_init(&(ptr_chann_desc->scratch_sem), 0);
-    sema_init(&(ptr_chann_desc->scratch_mutx), 1);
+	sema_init(&(ptr_chann_desc->scratch_sem), 0);
+	sema_init(&(ptr_chann_desc->scratch_mutx), 1);
 
 	//spin_lock_irqsave(&ptr_dma_desc->dma_lock, flags);
 
@@ -2926,25 +2649,25 @@ int xlnx_activate_dma_channel(ps_pcie_dma_desc_t *ptr_dma_desc,
 		goto error;
 	}
 
-	
+
 #ifdef PFORM_USCALE_NO_EP_PROCESSOR
 	if(ptr_chann_desc->is_aux_chann == true)
 #else
-	if(ptr_dma_desc->pform == EP)
+		if(ptr_dma_desc->pform == EP)
 #endif
-	{
-		/* Reset the DMA channel */
-		regval = RD_DMA_REG(ptr_chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET);
-		regval |= (DMA_CNTRL_RST_BIT);
-		WR_DMA_REG(ptr_chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET, regval);
+		{
+			/* Reset the DMA channel */
+			regval = RD_DMA_REG(ptr_chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET);
+			regval |= (DMA_CNTRL_RST_BIT);
+			WR_DMA_REG(ptr_chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET, regval);
 
-		/* Give 10ms delay for reset to complete */
-		mdelay(10);
+			/* Give 10ms delay for reset to complete */
+			mdelay(10);
 
-		regval = RD_DMA_REG(ptr_chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET);
-		regval &= (~(DMA_CNTRL_RST_BIT));
-		WR_DMA_REG(ptr_chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET, regval);
-	}
+			regval = RD_DMA_REG(ptr_chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET);
+			regval &= (~(DMA_CNTRL_RST_BIT));
+			WR_DMA_REG(ptr_chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET, regval);
+		}
 
 
 	/* Pogram Q addresses */
@@ -2958,14 +2681,14 @@ int xlnx_activate_dma_channel(ps_pcie_dma_desc_t *ptr_dma_desc,
 	sta_q_addr_lo |= DMA_QPTRLO_Q_ENABLE_BIT;
 
 	if(ptr_chann_desc->ptr_dma_desc->pform == EP)
-    {
+	{
 		/* Tell hardwrae that Q is resident on AXI memory */
 		data_q_addr_lo |= DMA_QPTRLO_QLOCAXI_BIT;
 		sta_q_addr_lo |= DMA_QPTRLO_QLOCAXI_BIT;
-    }
+	}
 
 	//TODO #warning take care of m_arcache/PCIE  attr
-    
+
 	if(data_q_sz < PS_PCIE_MIN_Q_SZ) 
 	{
 		ret = XLNX_ILLEGAL_Q_SZ;
@@ -2974,8 +2697,8 @@ int xlnx_activate_dma_channel(ps_pcie_dma_desc_t *ptr_dma_desc,
 
 	/* Set the hardware status Q sliding index */
 	ptr_chann_desc->idx_sta_q_hw = sta_q_sz - 1;
-    
-    if(ptr_chann_desc->dir == OUT) 
+
+	if(ptr_chann_desc->dir == OUT) 
 	{
 		/* SRC Q */
 		WR_DMA_REG(ptr_chan_dma_reg_vbaddr, DMA_SRCQNXT_REG_OFFSET, 0);
@@ -3013,23 +2736,23 @@ int xlnx_activate_dma_channel(ps_pcie_dma_desc_t *ptr_dma_desc,
 	{
 		/* Clear interrupts if any */
 		WR_DMA_REG(ptr_chan_dma_reg_vbaddr, DMA_PCIE_INTR_STATUS_REG_OFFSET, ~0);
-	
+
 		wmb();
-	
+
 		/* Register handler for interrupt vector */
 #ifdef PFORM_USCALE_NO_EP_PROCESSOR
 		printk(KERN_ERR"\n Is aux channel %d\n",(int)ptr_chann_desc->is_aux_chann);
 		if(ptr_chann_desc->is_aux_chann == false && ptr_chann_desc->intr_hndlr_registered == false) 
 #endif
 		{
-	
+
 			//spin_unlock_irqrestore(&ptr_dma_desc->dma_lock,flags);
 			sprintf(ptr_chann_desc->msix_hndlr_name, "PS PCIe DMA Chann %d Interrupt Handler",ptr_chann_desc->chann_id);
 			if(request_irq(ptr_chann_desc->ptr_dma_desc->entries[ptr_chann_desc->chann_id].vector,
-						   ps_pcie_intr_handler,
-						   0, 
-						   ptr_chann_desc->msix_hndlr_name, 
-						   ptr_chann_desc))
+						ps_pcie_intr_handler,
+						0, 
+						ptr_chann_desc->msix_hndlr_name, 
+						ptr_chann_desc))
 			{
 				ret = XLNX_MSIX_HNDLR_REG_FAIL;
 				goto msix_hndlr_registration_failed;
@@ -3040,7 +2763,7 @@ int xlnx_activate_dma_channel(ps_pcie_dma_desc_t *ptr_dma_desc,
 				printk(KERN_ERR"\n MSIx Interrupt handler registered\n");
 			}
 			//spin_lock_irqsave(&ptr_dma_desc->dma_lock, flags);
-	
+
 		}
 	}
 #endif
@@ -3066,9 +2789,9 @@ int xlnx_activate_dma_channel(ps_pcie_dma_desc_t *ptr_dma_desc,
 
 	if(ptr_dma_desc->pform == HOST 
 #ifdef PFORM_USCALE_NO_EP_PROCESSOR
-	   && ptr_chann_desc->is_aux_chann == true
+			&& ptr_chann_desc->is_aux_chann == true
 #endif
-	   ) 
+	  ) 
 	{
 		/* We are Host, we will now enable the channel */
 		regval = RD_DMA_REG(ptr_chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET);
@@ -3080,10 +2803,10 @@ int xlnx_activate_dma_channel(ps_pcie_dma_desc_t *ptr_dma_desc,
 	//ptr_chann_desc->channel_active_for_ios = true;
 
 #ifdef POLL_MODE
-    init_timer(&ptr_dma_desc->intr_poll_tmr);
+	init_timer(&ptr_dma_desc->intr_poll_tmr);
 	ptr_dma_desc->intr_poll_tmr.function = poll_intr_hndlr_fn;
 	ptr_dma_desc->intr_poll_tmr.data = (void*)ptr_dma_desc;
-    ptr_dma_desc->intr_poll_tmr.expires = jiffies + 1; /* parameter */
+	ptr_dma_desc->intr_poll_tmr.expires = jiffies + 1; /* parameter */
 	printk(KERN_ERR"\n Invoke poll mode %p\n", &ptr_dma_desc->intr_poll_tmr);
 	add_timer(&ptr_dma_desc->intr_poll_tmr);
 #endif
@@ -3092,7 +2815,6 @@ int xlnx_activate_dma_channel(ps_pcie_dma_desc_t *ptr_dma_desc,
 error:
 error_unaligned_q:
 error_wq_creat_failed:
-msix_hndlr_registration_failed:
 	//spin_unlock_irqrestore(&ptr_dma_desc->dma_lock,flags);
 
 	printk(KERN_ERR"\n DMA activate channel done %d\n",ret);
@@ -3127,20 +2849,20 @@ int xlnx_deactivate_dma_channel(ps_pcie_dma_chann_desc_t *ptr_chann_desc)
 
 	wmb();
 
-//	spin_unlock(&ptr_chann_desc->channel_lock);
+	//	spin_unlock(&ptr_chann_desc->channel_lock);
 	if(!in_atomic()) 
 	{
 		/* Flush workqueue */
-		
+
 		flush_workqueue(ptr_chann_desc->intr_handlr_wq);
 		printk("Flushing Worker Queque\n");
-	
-	    mdelay(10);
-   
-        destroy_workqueue(ptr_chann_desc->intr_handlr_wq);
-	         
+
 		mdelay(10);
-        ptr_chann_desc->intr_handlr_wq = NULL;
+
+		destroy_workqueue(ptr_chann_desc->intr_handlr_wq);
+
+		mdelay(10);
+		ptr_chann_desc->intr_handlr_wq = NULL;
 		if(ptr_chann_desc->coalse_cnt_set == true) 
 		{
 			del_timer_sync(&ptr_chann_desc->coal_cnt_timer);
@@ -3180,36 +2902,34 @@ int xlnx_deactivate_dma_channel(ps_pcie_dma_chann_desc_t *ptr_chann_desc)
 	}
 
 	/* Reset DMA */
-    {
-    	unsigned int regval = RD_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET);
-    	regval |= DMA_CNTRL_RST_BIT;
-    	WR_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET, regval);
+	{
+		unsigned int regval = RD_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET);
+		regval |= DMA_CNTRL_RST_BIT;
+		WR_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET, regval);
 
-    	/* Give 10ms delay for reset to complete */
-    	mdelay(10);
+		/* Give 10ms delay for reset to complete */
+		mdelay(10);
 
-    	regval = RD_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET);
-    	regval &= (~(DMA_CNTRL_RST_BIT));
-    	WR_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET, regval);
-    }
+		regval = RD_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET);
+		regval &= (~(DMA_CNTRL_RST_BIT));
+		WR_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET, regval);
+	}
 
 	/* Memset all Qs to 0*/
 	memset(ptr_chann_desc->ptr_ctx, 0, sizeof(data_q_cntxt_t) * ptr_chann_desc->data_q_sz);
 	memset(ptr_chann_desc->ptr_data_q.ptr_q, 0, sizeof(ps_pcie_src_bd_t) * ptr_chann_desc->data_q_sz);
 	memset(ptr_chann_desc->ptr_sta_q, 0, sizeof(ps_pcie_sta_desc_t) * ptr_chann_desc->sta_q_sz);
-#if 1
 	ptr_chann_desc->unusd_bd_idx_data_q = 0; //Index to slide on Data Q. Gives next unused BD
 	ptr_chann_desc->sop_bd_idx_data_q = 0; //Index to slide on Data Q. Gives BD which has first fragment of packet data
 	ptr_chann_desc->idx_cntxt_q = 0; //Index to slide on Context Q. Gives next unused context
 	ptr_chann_desc->idx_rxpostps_cntxt_q = 0; //Index to slide on Context Q. Gives start context from where post processing begins
 	ptr_chann_desc->idx_sta_q = 0; //Index to slide on status Q.
 	ptr_chann_desc->idx_sta_q_hw = 0;
-#endif
 
-    ptr_chann_desc->ptr_dma_desc->num_channels_alloc--;
-UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
+	ptr_chann_desc->ptr_dma_desc->num_channels_alloc--;
+	UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 
-	
+
 	/* Disable the channel */
 	return XLNX_SUCCESS;
 }
@@ -3218,7 +2938,6 @@ EXPORT_SYMBOL(xlnx_deactivate_dma_channel);
 int xlnx_stop_channel_IO(ps_pcie_dma_chann_desc_t *ptr_chann_desc, bool do_rst)
 {
 	int ret_val = XLNX_SUCCESS;
-	unsigned long flags;
 	//spin_lock_bh(&ptr_chann_desc->channel_lock);
 	ptr_chann_desc->chann_state = XLNX_DMA_CHANN_IO_QUIESCED;
 	//spin_unlock_bh(&ptr_chann_desc->channel_lock);
@@ -3233,17 +2952,17 @@ int xlnx_stop_channel_IO(ps_pcie_dma_chann_desc_t *ptr_chann_desc, bool do_rst)
 		/* Wait for outstanding IOs to get over */
 		msleep(10);
 
-        /* 
-		* We need to do a reset. We will make the EP side do the
-		* reset
-		*/
+		/* 
+		 * We need to do a reset. We will make the EP side do the
+		 * reset
+		 */
 		host_2_card_data[0] = XLNX_CMD_RESET_CHANN;
 
 		ret = xlnx_do_scrtchpd_txn_from_host(ptr_chann_desc,
-								   host_2_card_data,
-								   DMA_NUM_SCRPAD_REGS,
-								   card_2_host_data,
-								   DMA_NUM_SCRPAD_REGS);
+				host_2_card_data,
+				DMA_NUM_SCRPAD_REGS,
+				card_2_host_data,
+				DMA_NUM_SCRPAD_REGS);
 		if(ret == XLNX_SUCCESS && card_2_host_data[0] == XLNX_RSP_RESET_CHANN) 
 		{
 			printk(KERN_ERR"\n Received reset response channel %d", ptr_chann_desc->chann_id );
@@ -3287,66 +3006,64 @@ int xlnx_stop_channel_IO(ps_pcie_dma_chann_desc_t *ptr_chann_desc, bool do_rst)
 		}
 	}
 #else
-#if 1
-			if(ptr_chann_desc->is_aux_chann == true) 
-			{
-				//spin_lock_bh(&ptr_chann_desc->ptr_dma_desc->channels[ptr_chann_desc->chann_id].channel_lock);
-				ptr_chann_desc->ptr_dma_desc->channels[ptr_chann_desc->chann_id].chann_state = XLNX_DMA_CHANN_IO_QUIESCED;
-				//spin_unlock_bh(&ptr_chann_desc->ptr_dma_desc->channels[ptr_chann_desc->chann_id].channel_lock);
-			}
-			else
-			{
-				//spin_lock_bh(&ptr_chann_desc->ptr_dma_desc->aux_channels[ptr_chann_desc->chann_id].channel_lock);
-				ptr_chann_desc->ptr_dma_desc->aux_channels[ptr_chann_desc->chann_id].chann_state = XLNX_DMA_CHANN_IO_QUIESCED;
-				//spin_unlock_bh(&ptr_chann_desc->ptr_dma_desc->aux_channels[ptr_chann_desc->chann_id].channel_lock);
-			}
-#endif
-            /* Make DMA enable == 0 */
-			{
-				unsigned int regval = RD_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET);
-				regval &= 0xfffffffe;
-				WR_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET, regval);
-			}
+	if(ptr_chann_desc->is_aux_chann == true) 
+	{
+		//spin_lock_bh(&ptr_chann_desc->ptr_dma_desc->channels[ptr_chann_desc->chann_id].channel_lock);
+		ptr_chann_desc->ptr_dma_desc->channels[ptr_chann_desc->chann_id].chann_state = XLNX_DMA_CHANN_IO_QUIESCED;
+		//spin_unlock_bh(&ptr_chann_desc->ptr_dma_desc->channels[ptr_chann_desc->chann_id].channel_lock);
+	}
+	else
+	{
+		//spin_lock_bh(&ptr_chann_desc->ptr_dma_desc->aux_channels[ptr_chann_desc->chann_id].channel_lock);
+		ptr_chann_desc->ptr_dma_desc->aux_channels[ptr_chann_desc->chann_id].chann_state = XLNX_DMA_CHANN_IO_QUIESCED;
+		//spin_unlock_bh(&ptr_chann_desc->ptr_dma_desc->aux_channels[ptr_chann_desc->chann_id].channel_lock);
+	}
+	/* Make DMA enable == 0 */
+	{
+		unsigned int regval = RD_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET);
+		regval &= 0xfffffffe;
+		WR_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET, regval);
+	}
 
-			mdelay(10);
+	mdelay(10);
 
-			/* Check if the DMA is still running */
-			{
-				unsigned int regval = RD_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_STATUS_REG_OFFSET);
-				if(regval & DMA_STATUS_DMA_RUNNING_BIT) 
-				{
-					printk(KERN_ERR"\n DMA still running, will reset!!");
-				}
-				else
-				{
-					printk(KERN_ERR"\n DMA quiet reset now\n");
-				}
-			}
+	/* Check if the DMA is still running */
+	{
+		unsigned int regval = RD_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_STATUS_REG_OFFSET);
+		if(regval & DMA_STATUS_DMA_RUNNING_BIT) 
+		{
+			printk(KERN_ERR"\n DMA still running, will reset!!");
+		}
+		else
+		{
+			printk(KERN_ERR"\n DMA quiet reset now\n");
+		}
+	}
 
-			/* Reset DMA */
-			{
-				unsigned int regval = RD_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET);
-				regval |= DMA_CNTRL_RST_BIT;
-				WR_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET, regval);
+	/* Reset DMA */
+	{
+		unsigned int regval = RD_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET);
+		regval |= DMA_CNTRL_RST_BIT;
+		WR_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET, regval);
 
-				/* Give 10ms delay for reset to complete */
-				mdelay(10);
+		/* Give 10ms delay for reset to complete */
+		mdelay(10);
 
-				regval = RD_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET);
-				regval &= (~(DMA_CNTRL_RST_BIT));
-				WR_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET, regval);
-			}
+		regval = RD_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET);
+		regval &= (~(DMA_CNTRL_RST_BIT));
+		WR_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_CNTRL_REG_OFFSET, regval);
+	}
 
-			rmb();
+	rmb();
 
-			/* Check if the DMA is still running */
-			{
-				unsigned int regval = RD_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_STATUS_REG_OFFSET);
-				if(regval & DMA_STATUS_DMA_RUNNING_BIT) 
-				{
-					printk(KERN_ERR"\n DMA still running, after reset!!");
-				}
-			}
+	/* Check if the DMA is still running */
+	{
+		unsigned int regval = RD_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_STATUS_REG_OFFSET);
+		if(regval & DMA_STATUS_DMA_RUNNING_BIT) 
+		{
+			printk(KERN_ERR"\n DMA still running, after reset!!");
+		}
+	}
 
 #endif
 
@@ -3356,7 +3073,7 @@ int xlnx_stop_channel_IO(ps_pcie_dma_chann_desc_t *ptr_chann_desc, bool do_rst)
 	{
 		/* Unregister interrupt handler */
 		free_irq(ptr_chann_desc->ptr_dma_desc->entries[ptr_chann_desc->chann_id].vector, 
-				 ptr_chann_desc);
+				ptr_chann_desc);
 	}
 #endif
 #endif
@@ -3366,38 +3083,29 @@ int xlnx_stop_channel_IO(ps_pcie_dma_chann_desc_t *ptr_chann_desc, bool do_rst)
 }
 EXPORT_SYMBOL(xlnx_stop_channel_IO);
 
-int xlnx_restart_channel_IO(ps_pcie_dma_chann_desc_t *ptr_chann_desc)
-{
-	unsigned long flags;
-	spin_lock_irqsave(&ptr_chann_desc->channel_lock,flags);
-	spin_unlock_irqrestore(&ptr_chann_desc->channel_lock,flags);
-}
-EXPORT_SYMBOL(xlnx_restart_channel_IO);
-
 
 /*
-* Invoked by DMA driver when there is doorbell data from HOST
-*/
+ * Invoked by DMA driver when there is doorbell data from HOST
+ */
 void xlnx_register_doorbell_cbk(ps_pcie_dma_chann_desc_t *ptr_chann_desc,
-							   func_doorbell_cbk_no_block ptr_fn_drbell_cbk)
+		func_doorbell_cbk_no_block ptr_fn_drbell_cbk)
 {
 	unsigned long flags;
 
-    spin_lock_irqsave(&ptr_chann_desc->channel_lock, flags);
+	spin_lock_irqsave(&ptr_chann_desc->channel_lock, flags);
 	ptr_chann_desc->dbell_cbk = ptr_fn_drbell_cbk;
 	spin_unlock_irqrestore(&ptr_chann_desc->channel_lock, flags);
 }
 EXPORT_SYMBOL(xlnx_register_doorbell_cbk);
 
 /*
-* Send scratchpad response data to HOST 
-*/
+ * Send scratchpad response data to HOST 
+ */
 void xlnx_give_scrtchpd_rsp_to_host(ps_pcie_dma_chann_desc_t *ptr_chann_desc,
-                                   unsigned int *ptr_card_2_host_data,
-								   unsigned int num_dwords_card_2_host
-								   )
+		unsigned int *ptr_card_2_host_data,
+		unsigned int num_dwords_card_2_host
+		)
 {
-	unsigned long flags;
 	int i;
 	unsigned int intr_assrt = 0;
 
@@ -3424,15 +3132,15 @@ void xlnx_give_scrtchpd_rsp_to_host(ps_pcie_dma_chann_desc_t *ptr_chann_desc,
 EXPORT_SYMBOL(xlnx_give_scrtchpd_rsp_to_host);
 
 /*
-* Send scratchpad command to EP & block till response arrives
-* Note this function cannot be called from non interrupt context
-*/
+ * Send scratchpad command to EP & block till response arrives
+ * Note this function cannot be called from non interrupt context
+ */
 int xlnx_do_scrtchpd_txn_from_host(ps_pcie_dma_chann_desc_t *ptr_chann_desc,
-								   unsigned int *ptr_host_2_card_data,
-								   unsigned int num_dwords_host_2_card,
-								   unsigned int *ptr_card_2_host_data,
-								   unsigned int num_dwords_card_2_host
-								   )
+		unsigned int *ptr_host_2_card_data,
+		unsigned int num_dwords_host_2_card,
+		unsigned int *ptr_card_2_host_data,
+		unsigned int num_dwords_card_2_host
+		)
 {
 	int retval = XLNX_SUCCESS;
 	int i;
@@ -3477,8 +3185,8 @@ int xlnx_do_scrtchpd_txn_from_host(ps_pcie_dma_chann_desc_t *ptr_chann_desc,
 
 	up(&ptr_chann_desc->scratch_mutx);
 
-	
-	
+
+
 
 scratchpad_io_in_progress:
 	return retval;
@@ -3486,16 +3194,16 @@ scratchpad_io_in_progress:
 EXPORT_SYMBOL(xlnx_do_scrtchpd_txn_from_host);
 
 /*
-* Interfaces exported End
-*/
+ * Interfaces exported End
+ */
 
 
 static int __init xlnx_pcie_dma_driver_init(void)
 {
 	int retval;
-	
+
 	retval = pci_register_driver(&nwl_dma_driver);
-	
+
 	printk(KERN_ERR" Module loaded/not-loaded with retval %d", retval);
 	return retval;
 }
@@ -3504,7 +3212,7 @@ static void __exit xlnx_pcie_dma_driver_exit(void)
 {
 	printk(KERN_ERR"\n PCIe driver unloading\n");
 	pci_unregister_driver(&nwl_dma_driver);
-	
+
 
 }
 

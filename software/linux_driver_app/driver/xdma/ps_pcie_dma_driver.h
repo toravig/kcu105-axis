@@ -46,7 +46,7 @@
 #ifdef AXI_PERF_MON
 #ifdef PFORM_RONALDO
 #define AXI_PERF_MON_REG_BASE_ADDR (0x43C30000)
-	
+
 #else
 #error "Define AXI side platform type in *_pf.h"
 #endif
@@ -88,9 +88,9 @@
 #define HEART_BEAT_INTERVAL_SECS (1)
 
 /*
-* Time in terms of HZ after which the coalesce count timer runs
-* Lower value means quicker response time
-*/
+ * Time in terms of HZ after which the coalesce count timer runs
+ * Lower value means quicker response time
+ */
 #define COALESCE_TIMER_MAGNITUDE (10*HZ)
 
 
@@ -277,7 +277,7 @@ struct ps_pcie_dst_bd
 	unsigned int byte_count: 24; //Size of data buffer in bytes
 	unsigned int loc_axi: 1; //Set to 1 if data buffer is on AXI memory
 	unsigned int use_nxt_bd_on_eop: 1; //Skip to Next Destination SGL on End of Packet
-    unsigned int rsvd: 2; //Reserved
+	unsigned int rsvd: 2; //Reserved
 	unsigned int dma_data_rd_attr: 4; //DMA data read attributes
 	unsigned short usr_handle; //User handle copied in status Q BD
 	unsigned short rsvd1; //Reserved			
@@ -304,14 +304,14 @@ typedef union
 {
 	ps_pcie_src_bd_t *ptr_src_q;
 	ps_pcie_dst_bd_t *ptr_dst_q;
-    u8 *ptr_q;
+	u8 *ptr_q;
 }dataq_ptr_t;
 
 
 
 /*
-* This enumeration lists the DMA channels
-*/
+ * This enumeration lists the DMA channels
+ */
 typedef enum
 {
 	CHAN_0,
@@ -321,8 +321,8 @@ typedef enum
 }chan_t;
 
 /*
-* This enumeration indicates the platform (Host/EP) on which the driver is executing
-*/
+ * This enumeration indicates the platform (Host/EP) on which the driver is executing
+ */
 typedef enum
 {
 	HOST,
@@ -337,16 +337,16 @@ typedef enum
 	VIRT_ADDR, //Unmapped Virtual address. Driver maps/unmaps this for DMA access
 	PHYS_ADDR //Physical address. Driver will not flush/invalidate the buffer. This is callers responsibility
 #ifdef PFORM_USCALE_NO_EP_PROCESSOR
-	,EP_PHYS_ADDR //Physical address on platform across PCIe interface i.e. for HOST side software the address is for EP physical memory
+		,EP_PHYS_ADDR //Physical address on platform across PCIe interface i.e. for HOST side software the address is for EP physical memory
 #endif
 }addr_type_t;
 
 
 /*
-* This enumeration indicates the direction of data flow with respect to the platform (Host/EP).
-* Taking C2S data flow as example, host would indicate direction of channel as IN, while EP would indicate 
-* the direction of channel as OUT
-*/
+ * This enumeration indicates the direction of data flow with respect to the platform (Host/EP).
+ * Taking C2S data flow as example, host would indicate direction of channel as IN, while EP would indicate 
+ * the direction of channel as OUT
+ */
 typedef enum
 {
 	OUT,
@@ -365,21 +365,21 @@ struct _ps_pcie_dma_chann_desc; //forward declaration
 
 
 /* Callback firect by DMA driver when the underlying health of channel changes in EP
-* e.g. If channel is not allocated or is shut down asynchronously by EP.
-* The function is invoked by the driver after taking the channel lock
-*/
+ * e.g. If channel is not allocated or is shut down asynchronously by EP.
+ * The function is invoked by the driver after taking the channel lock
+ */
 typedef void (*func_ptr_chann_health_cbk_no_block)(struct _ps_pcie_dma_chann_desc *);
 
 typedef void (*func_doorbell_cbk_no_block)(struct _ps_pcie_dma_chann_desc *,
-										   unsigned int *ptr_host_2_card_data,
-										   unsigned int num_dwords_host_2_card);
+		unsigned int *ptr_host_2_card_data,
+		unsigned int num_dwords_host_2_card);
 
 
 typedef void (*func_ptr_dma_chann_cbk_noblock)(struct _ps_pcie_dma_chann_desc *, 
-											   void *data, 
-											   unsigned int compl_bytes, 
-											   unsigned short uid, 
-											   unsigned int num_frags);
+		void *data, 
+		unsigned int compl_bytes, 
+		unsigned short uid, 
+		unsigned int num_frags);
 
 typedef volatile struct
 {
@@ -394,12 +394,12 @@ typedef volatile struct
 }data_q_cntxt_t;
 
 /*
-* This structure is a placeholder for data pertaining to the 
-* each PCIe DMA channel supported by DMA.
-*/
+ * This structure is a placeholder for data pertaining to the 
+ * each PCIe DMA channel supported by DMA.
+ */
 typedef struct _ps_pcie_dma_chann_desc
 {
-    bool channel_is_active; //application is using this channel
+	bool channel_is_active; //application is using this channel
 	bool latched;	//host-EP driver-application in synch
 	direction_t dir; //data flow direction from platform (IN/OUT)
 	u32 chann_id;
@@ -417,7 +417,7 @@ typedef struct _ps_pcie_dma_chann_desc
 	bool is_aux_chann;
 #endif
 #ifdef TEST_DBG_ON
-    unsigned int prev_num_pkts_io; //Used to detect stalling
+	unsigned int prev_num_pkts_io; //Used to detect stalling
 	unsigned int bds_alloc;
 	unsigned int bds_freed;
 	unsigned int cbk_called;
@@ -426,12 +426,12 @@ typedef struct _ps_pcie_dma_chann_desc
 	unsigned char *test_buf;
 	unsigned int saturate_flag;
 #endif
-//#ifndef PFORM_USCALE_NO_EP_PROCESSOR
+	//#ifndef PFORM_USCALE_NO_EP_PROCESSOR
 	func_ptr_chann_health_cbk_no_block ptr_func_health;
 	struct task_struct *hbeat_thrd;
 	char hbeat_thrd_name[64];
 	bool chk_hbeat;
-//#endif
+	//#endif
 	struct semaphore scratch_sem;
 	struct semaphore scratch_mutx;
 	func_doorbell_cbk_no_block dbell_cbk;
@@ -444,7 +444,7 @@ typedef struct _ps_pcie_dma_chann_desc
 	u8 __iomem *chan_dma_reg_vbaddr; //Virtual Base address of the DMA registers
 	dataq_ptr_t ptr_data_q;
 	ps_pcie_sta_desc_t *ptr_sta_q;
-    data_q_cntxt_t *ptr_ctx; //Pointer to context array
+	data_q_cntxt_t *ptr_ctx; //Pointer to context array
 	unsigned int unusd_bd_idx_data_q; //Index to slide on Data Q. Gives next unused BD
 	unsigned int sop_bd_idx_data_q; //Index to slide on Data Q. Gives BD which has first fragment of packet data
 	unsigned int idx_cntxt_q; //Index to slide on Context Q. Gives next unused context
@@ -456,18 +456,18 @@ typedef struct _ps_pcie_dma_chann_desc
 	spinlock_t channel_lock;
 	bool coalse_cnt_set; //Flag to check if coalesce count is set
 	struct timer_list coal_cnt_timer; //Timer to periodically check BDs for residual packets with coalesce count set
-    struct workqueue_struct *intr_handlr_wq; //Work Q to handle interrupts for this channel
-    struct work_struct intrh_work; //Work instance to handle interrupt
-    unsigned int src_sgl_err;
-    unsigned int dst_sgl_err;
-   unsigned int internal_err;	
+	struct workqueue_struct *intr_handlr_wq; //Work Q to handle interrupts for this channel
+	struct work_struct intrh_work; //Work instance to handle interrupt
+	unsigned int src_sgl_err;
+	unsigned int dst_sgl_err;
+	unsigned int internal_err;	
 }ps_pcie_dma_chann_desc_t;
 
 /*
-* This structure is a placeholder for data pertaining to the 
-* PCIe DMA. There is a single global instance of this structure maintained by the driver
-* executing on Host/EP
-*/
+ * This structure is a placeholder for data pertaining to the 
+ * PCIe DMA. There is a single global instance of this structure maintained by the driver
+ * executing on Host/EP
+ */
 typedef struct _ps_pcie_dma_desc
 {
 #ifdef POLL_MODE
@@ -484,14 +484,14 @@ typedef struct _ps_pcie_dma_desc
 	u32 num_channels; //total number of channels supported by DMA 
 	u32 num_channels_active; //number of channels active
 	u32 num_channels_alloc; //number of channels allocated for use
-    platform_t pform; //Host/EP
+	platform_t pform; //Host/EP
 	ps_pcie_dma_chann_desc_t channels[PS_PCIE_NUM_DMA_CHANNELS]; //array of channel descriptors
 #if defined(PFORM_USCALE_NO_EP_PROCESSOR) || defined(HW_SGL_DESIGN) || defined(DDR_DESIGN)
 	unsigned long cntrl_func_phy_base_addr; //Physical Base address of the AXI control functions via ingress translation
 	u8 __iomem *cntrl_func_virt_base_addr; //Virtual Base address of the AXI control functions via ingress translation
 	ps_pcie_dma_chann_desc_t aux_channels[PS_PCIE_NUM_DMA_CHANNELS]; //array of channel descriptors
 #endif
-    	u64 dma_reg_phy_base_addr; //Physical Base address of the DMA registers
+	u64 dma_reg_phy_base_addr; //Physical Base address of the DMA registers
 	u8 __iomem *dma_reg_virt_base_addr; //Virtual Base address of the DMA registers
 	u64 dma_chann_reg_phy_base_addr; //Physical Base address of the DMA Channel registers
 	u8 __iomem *dma_chann_reg_virt_base_addr; //Virtual Base address of the DMA Channel registers
@@ -500,8 +500,8 @@ typedef struct _ps_pcie_dma_desc
 
 
 /*
-* Union abstracting underlying device pcie/axi corresponding to Host/EP
-*/
+ * Union abstracting underlying device pcie/axi corresponding to Host/EP
+ */
 typedef union
 {
 	struct platform_device *op;
@@ -512,105 +512,105 @@ typedef union
 
 
 /*
-* APIs exported only on Host platform
-*/
+ * APIs exported only on Host platform
+ */
 struct pci_device *xlnx_get_pcie_devs(u16 dev_id, u16 vendor_id);//Invoked by host applications to get pcie devices
-																	//with matching device and vendor id combination
-																	//The pcie devices are probed by the dma driver
-																	// NULL 
+//with matching device and vendor id combination
+//The pcie devices are probed by the dma driver
+// NULL 
 
 
 /* 
-* Exported Common API list
-* These APIs are exported on both Host & EP platforms
-*/
+ * Exported Common API list
+ * These APIs are exported on both Host & EP platforms
+ */
 
 /*
-* Description: This API returns an instance of the 'ps_pcie_dma_desc_t' structure discovered in a system. On HOST the number of 'ps_pcie_dma_desc_t'
-* instances is equal to the PCIe end points having Xilinx PCIe IP(NWL AXI-PCIe Bridge). On HOST the API traverses a list of 'ps_pcie_dma_desc_t' to get 
-* next instance to return. 
-* On EP a single instance of 'ps_pcie_dma_desc_t' is present which is returned back.
-* On HOST side the API can be called successively till NULL is returned signalling no more instances of 'ps_pcie_dma_desc_t'
-* This API is used by a higher level application specific software driver (ethernet, SCSI, Video, Raw IO, etc) to discover compatible devices using which
-* services can be provided to overhead stacks/applications 
-*
-* Parameter(s):
-* @prev_desc - Upon first invocation NULL is passed. Successive invocation will require passing pointer to 'ps_pcie_dma_desc_t' that was returned as
-*				a result of previous invocation.
-* @vendid - On HOST side provide PCIe vendor id identifying EP that the driver wants to control. On EP pass 0.
-* @devid - On EP side provide PCIe device id identifying EP that the driver wants to control. On EP pass 0.
-*
-* Return: Pointer to 'ps_pcie_dma_desc_t' discovered in system. 
-* Locking - No locks need to be taken. 
-* Blocking - API does not block
-*/
+ * Description: This API returns an instance of the 'ps_pcie_dma_desc_t' structure discovered in a system. On HOST the number of 'ps_pcie_dma_desc_t'
+ * instances is equal to the PCIe end points having Xilinx PCIe IP(NWL AXI-PCIe Bridge). On HOST the API traverses a list of 'ps_pcie_dma_desc_t' to get 
+ * next instance to return. 
+ * On EP a single instance of 'ps_pcie_dma_desc_t' is present which is returned back.
+ * On HOST side the API can be called successively till NULL is returned signalling no more instances of 'ps_pcie_dma_desc_t'
+ * This API is used by a higher level application specific software driver (ethernet, SCSI, Video, Raw IO, etc) to discover compatible devices using which
+ * services can be provided to overhead stacks/applications 
+ *
+ * Parameter(s):
+ * @prev_desc - Upon first invocation NULL is passed. Successive invocation will require passing pointer to 'ps_pcie_dma_desc_t' that was returned as
+ *				a result of previous invocation.
+ * @vendid - On HOST side provide PCIe vendor id identifying EP that the driver wants to control. On EP pass 0.
+ * @devid - On EP side provide PCIe device id identifying EP that the driver wants to control. On EP pass 0.
+ *
+ * Return: Pointer to 'ps_pcie_dma_desc_t' discovered in system. 
+ * Locking - No locks need to be taken. 
+ * Blocking - API does not block
+ */
 ps_pcie_dma_desc_t* xlnx_get_pform_dma_desc(void *prev_desc, 
-											unsigned short vendid, 
-											unsigned short devid
-											); 
-							
+		unsigned short vendid, 
+		unsigned short devid
+		); 
+
 int xlnx_get_dma(void *dev, platform_t pform, ps_pcie_dma_desc_t **pptr_dma_desc); //Invoked by ep-application & host application 
-																								   // driver during init to get dma engine descriptor
-																								   // corresponding to device 
+// driver during init to get dma engine descriptor
+// corresponding to device 
 
 /*
-* Description: This API is used to acquire a DMA channel for IOs. higher level application specific software driver (ethernet, SCSI, Video, Raw IO, etc)
-* require to first get a DMA channel to perform IOs with HOST/EP.
-*
-* Parameter(s):
-* @ptr_dma_desc: Pointer to instance of 'ps_pcie_dma_desc_t' which encapsulates the DMA channel. This pointer can be acquired by maing a call to
-*				'xlnx_get_pform_dma_desc'
-* @channel_id: Decimal number indicating DMA channel number to acquire. 1st channel is indicated by number 0.
-* @dir: Enumeration IN/OUT, indicating direction of data transfer. If platform is transferring data pass 'OUT'. In case of data reception
-*		pass 'IN'
-* @pptr_chann_desc: 
-*/
+ * Description: This API is used to acquire a DMA channel for IOs. higher level application specific software driver (ethernet, SCSI, Video, Raw IO, etc)
+ * require to first get a DMA channel to perform IOs with HOST/EP.
+ *
+ * Parameter(s):
+ * @ptr_dma_desc: Pointer to instance of 'ps_pcie_dma_desc_t' which encapsulates the DMA channel. This pointer can be acquired by maing a call to
+ *				'xlnx_get_pform_dma_desc'
+ * @channel_id: Decimal number indicating DMA channel number to acquire. 1st channel is indicated by number 0.
+ * @dir: Enumeration IN/OUT, indicating direction of data transfer. If platform is transferring data pass 'OUT'. In case of data reception
+ *		pass 'IN'
+ * @pptr_chann_desc: 
+ */
 int xlnx_get_dma_channel(ps_pcie_dma_desc_t *ptr_dma_desc, u32 channel_id, 
-						 direction_t dir, ps_pcie_dma_chann_desc_t **pptr_chann_desc,
-						 func_ptr_chann_health_cbk_no_block ptr_chann_health);
+		direction_t dir, ps_pcie_dma_chann_desc_t **pptr_chann_desc,
+		func_ptr_chann_health_cbk_no_block ptr_chann_health);
 
 int xlnx_rel_dma_channel(ps_pcie_dma_chann_desc_t *ptr_chann_desc);//Invoked by ep-application & host application driver 
-																								// to relinquish acquired DMA channel
+// to relinquish acquired DMA channel
 int xlnx_activate_dma_channel(ps_pcie_dma_desc_t *ptr_dma_desc, 
-							  ps_pcie_dma_chann_desc_t *ptr_chann_desc,
-							  unsigned int data_q_addr_hi, //Physical address
-							  unsigned int data_q_addr_lo,//Physical address
-							  unsigned int data_q_sz,
-                              unsigned int sta_q_addr_hi,//Physical address
-							  unsigned int sta_q_addr_lo,//Physical address
-							  unsigned int sta_q_sz,
-							  unsigned char coalesce_cnt //Coalesce count for SGL interrupt resporting
-							);
+		ps_pcie_dma_chann_desc_t *ptr_chann_desc,
+		unsigned int data_q_addr_hi, //Physical address
+		unsigned int data_q_addr_lo,//Physical address
+		unsigned int data_q_sz,
+		unsigned int sta_q_addr_hi,//Physical address
+		unsigned int sta_q_addr_lo,//Physical address
+		unsigned int sta_q_sz,
+		unsigned char coalesce_cnt //Coalesce count for SGL interrupt resporting
+		);
 int xlnx_alloc_queues(ps_pcie_dma_chann_desc_t *ptr_chann_desc,
-							  unsigned int *ptr_data_q_addr_hi, //Physical address
-							  unsigned int *ptr_data_q_addr_lo,//Physical address
-                              unsigned int *ptr_sta_q_addr_hi,//Physical address
-							  unsigned int *ptr_sta_q_addr_lo,//Physical address
-							  unsigned int q_num_elements);
+		unsigned int *ptr_data_q_addr_hi, //Physical address
+		unsigned int *ptr_data_q_addr_lo,//Physical address
+		unsigned int *ptr_sta_q_addr_hi,//Physical address
+		unsigned int *ptr_sta_q_addr_lo,//Physical address
+		unsigned int q_num_elements);
 int xlnx_dealloc_queues(ps_pcie_dma_chann_desc_t *ptr_chann_desc);
 
 int xlnx_data_frag_io(ps_pcie_dma_chann_desc_t *ptr_chan_desc, 
-					  unsigned char *addr_buf,
-					  addr_type_t at,
-					  size_t sz,
-					  func_ptr_dma_chann_cbk_noblock cbk,
-					  unsigned short uid, 
-					  bool last_frag, 
-					 /* direction_t dir, */
-					  void *ptr_user_data);
+		unsigned char *addr_buf,
+		addr_type_t at,
+		size_t sz,
+		func_ptr_dma_chann_cbk_noblock cbk,
+		unsigned short uid, 
+		bool last_frag, 
+		/* direction_t dir, */
+		void *ptr_user_data);
 unsigned int xlnx_get_chann_num_free_bds(ps_pcie_dma_chann_desc_t *ptr_chan_desc);
 void xlnx_register_doorbell_cbk(ps_pcie_dma_chann_desc_t *ptr_chann_desc,
-							   func_doorbell_cbk_no_block ptr_fn_drbell_cbk);
+		func_doorbell_cbk_no_block ptr_fn_drbell_cbk);
 void xlnx_give_scrtchpd_rsp_to_host(ps_pcie_dma_chann_desc_t *ptr_chann_desc,
-                                   unsigned int *ptr_card_2_host_data,
-								   unsigned int num_dwords_card_2_host
-								   );
+		unsigned int *ptr_card_2_host_data,
+		unsigned int num_dwords_card_2_host
+		);
 int xlnx_do_scrtchpd_txn_from_host(ps_pcie_dma_chann_desc_t *ptr_chann_desc,
-								   unsigned int *ptr_host_2_card_data,
-								   unsigned int num_dwords_host_2_card,
-								   unsigned int *ptr_card_2_host_data,
-								   unsigned int num_dwords_card_2_host
-								   );
+		unsigned int *ptr_host_2_card_data,
+		unsigned int num_dwords_host_2_card,
+		unsigned int *ptr_card_2_host_data,
+		unsigned int num_dwords_card_2_host
+		);
 int xlnx_stop_channel_IO(ps_pcie_dma_chann_desc_t *ptr_chann_desc, bool do_rst);
 int xlnx_deactivate_dma_channel(ps_pcie_dma_chann_desc_t *ptr_chann_desc);
 
@@ -704,8 +704,8 @@ int xlnx_deactivate_dma_channel(ps_pcie_dma_chann_desc_t *ptr_chann_desc);
 
 /* Operating mode */
 #define NO_CACHE_FLUSH_INVALIDATE //Turn off flushing and invalidation of cache
-									//This can be set for increased performance if the processor is 
-									//not accessing data being ferried across PCIe and is just forwarding/receiving packets
+//This can be set for increased performance if the processor is 
+//not accessing data being ferried across PCIe and is just forwarding/receiving packets
 
 #ifdef TEST_DBG_ON
 #if defined(PFORM_USCALE_NO_EP_PROCESSOR) || defined(DDR_DESIGN)
