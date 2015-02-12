@@ -316,19 +316,20 @@ void cbk_data_pump(struct _ps_pcie_dma_chann_desc *ptr_chann, void *data, unsign
 
 void cbk_data_rxpump(struct _ps_pcie_dma_chann_desc *ptr_chann, void *data, unsigned int compl_bytes,unsigned short uid, unsigned int num_frags)
 {
+	//struct task_struct* task = (struct task_struct*)data;
 	PktBuf * pbuf;
 	int i=0;
 	unsigned int flags;
-	static int pktSize;
 	unsigned char *usrAddr = NULL;
 	BufferInfo tempBuffInfo;
 	static int  noPages =0 ;
+
 	if(ptr_chann->chann_state == XLNX_DMA_CNTXTQ_SATURATED || ptr_chann->chann_state == XLNX_DMA_CHANN_SATURATED)
 	{
 		/* Make the channel state as 'no error' */
 		ptr_chann->chann_state = XLNX_DMA_CHANN_NO_ERR;
 	}
-	//  rx_channel_num_empty_bds += num_frags;	
+
 
 	for(i=0; i< num_frags; i++)
 	{
@@ -338,36 +339,29 @@ void cbk_data_rxpump(struct _ps_pcie_dma_chann_desc *ptr_chann, void *data, unsi
 			dma_unmap_page(ptr_chann->ptr_dma_desc->dev,pbuf->bufPA,pbuf->size,DMA_FROM_DEVICE);
 		if(pbuf->pageAddr)
 			page_cache_release( (struct page *)pbuf->pageAddr);
-
-		pktSize = pktSize + pbuf->size;
-		if (flags & PKT_SOP)
+		if(i== 0)
 		{
 			usrAddr = pbuf->bufInfo;
-			pktSize = pbuf->size;
 		}
 		noPages++;
-		if (flags & PKT_EOP)
-		{
-			tempBuffInfo.bufferAddress = usrAddr;
-			tempBuffInfo.buffSize = pktSize;
-			tempBuffInfo.noPages= noPages ;  
-			tempBuffInfo.endAddress= pbuf->bufInfo;
-			tempBuffInfo.endSize=pbuf->size;
-			/* put the packet in driver queue*/
-			putBuffInfo (&RxDoneQ, tempBuffInfo);
-			pktSize = 0;
-			noPages=0;
-			usrAddr = NULL;
-		}
-
 		RxReadIndex++;
 		if(RxReadIndex >=NUM_Q_ELEM)
 			RxReadIndex=0;
 		rx_channel_num_empty_bds++;
-
-
-
 	}
+
+	tempBuffInfo.bufferAddress = usrAddr;
+	tempBuffInfo.buffSize = compl_bytes;
+	tempBuffInfo.noPages= noPages ;  
+	tempBuffInfo.endAddress= pbuf->bufInfo;
+	tempBuffInfo.endSize=pbuf->size;
+	/* put the packet in driver queue*/
+	putBuffInfo (&RxDoneQ, tempBuffInfo);
+
+
+
+
+
 
 }
 
@@ -885,6 +879,7 @@ xraw_dev_ioctl (struct file *filp,
 {
 	int retval = 0;
 	TestCmd tc;
+	//int reg_val;
 	u8 __iomem *gen_chk_reg_vbaseaddr = ptr_txapp_dma_desc->cntrl_func_virt_base_addr + GEN_CHECK_OFFSET_START;
 	/* Check cmd type and value */
 	if (_IOC_TYPE (cmd) != XPMON_MAGIC)

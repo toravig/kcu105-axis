@@ -256,15 +256,12 @@ getBuffInfo (BufferInfoQue * bQue, BufferInfo * buff)
 
 void cbk_data_pump(struct _ps_pcie_dma_chann_desc *ptr_chann, void *data, unsigned int compl_bytes,unsigned short uid, unsigned int num_frags)
 {
-	//struct task_struct* task = (struct task_struct*)data;
 	PktBuf * pbuf;
 	int i=0;
 	unsigned int flags;
 	static int pktSize;
 	unsigned char *usrAddr = NULL;
 	BufferInfo tempBuffInfo;
-
-
 	if(ptr_chann->chann_state == XLNX_DMA_CNTXTQ_SATURATED || ptr_chann->chann_state == XLNX_DMA_CHANN_SATURATED)
 	{
 		/* Make the channel state as 'no error' */
@@ -307,8 +304,6 @@ void cbk_data_pump(struct _ps_pcie_dma_chann_desc *ptr_chann, void *data, unsign
 		}
 
 	}
-
-
 }
 
 
@@ -374,9 +369,6 @@ void cbk_data_rxaux(struct _ps_pcie_dma_chann_desc *ptr_chann, void *data, unsig
 	int retval;
 	unsigned int i;
 	unsigned int packet_size;
-
-
-
 	if(ptr_chann->chann_state == XLNX_DMA_CNTXTQ_SATURATED || ptr_chann->chann_state == XLNX_DMA_CHANN_SATURATED)
 	{
 		/* Make the channel state as 'no error' */
