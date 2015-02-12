@@ -1269,7 +1269,6 @@ void XXgEthernet_PhyWrite(XXgEthernet *InstancePtr, u32 PhyAddress,
 	 * - Check for MDIO ready at every step
 	 */
 
-#if 1
 	/*
 	 * Wait till the MDIO interface is ready to accept a new transaction.
 	 */
@@ -1277,7 +1276,6 @@ void XXgEthernet_PhyWrite(XXgEthernet *InstancePtr, u32 PhyAddress,
 					XXGE_MDIO_CFG1_OFFSET) & XXGE_MDIO_CFG1_READY_MASK)) {
 		;
 	}
-#endif
 	printk("MDIO CFG1 %x = %x\n", XXGE_MDIO_CFG1_OFFSET, 
 			XXgEthernet_ReadReg(InstancePtr->Config.BaseAddress,
 				XXGE_MDIO_CFG1_OFFSET));
@@ -1290,7 +1288,6 @@ void XXgEthernet_PhyWrite(XXgEthernet *InstancePtr, u32 PhyAddress,
 	XXgEthernet_WriteReg(InstancePtr->Config.BaseAddress,
 			XXGE_MDIO_TX_DATA_OFFSET, (RegisterNum & XXGE_MDIO_TX_DATA_MASK));
 
-#if 1
 	/*
 	 * Wait till MDIO transaction is completed.
 	 */
@@ -1298,7 +1295,6 @@ void XXgEthernet_PhyWrite(XXgEthernet *InstancePtr, u32 PhyAddress,
 					XXGE_MDIO_CFG1_OFFSET) & XXGE_MDIO_CFG1_READY_MASK)) {
 		;
 	}
-#endif
 	printk("MDIO CFG1 %x = %x\n", XXGE_MDIO_CFG1_OFFSET, 
 			XXgEthernet_ReadReg(InstancePtr->Config.BaseAddress,
 				XXGE_MDIO_CFG1_OFFSET));
@@ -1311,7 +1307,6 @@ void XXgEthernet_PhyWrite(XXgEthernet *InstancePtr, u32 PhyAddress,
 	XXgEthernet_WriteReg(InstancePtr->Config.BaseAddress, 
 			XXGE_MDIO_TX_DATA_OFFSET, (PhyData & XXGE_MDIO_TX_DATA_MASK));
 
-#if 1
 	/*
 	 * Wait till the MDIO interface is ready to accept a new transaction.
 	 */
@@ -1319,7 +1314,6 @@ void XXgEthernet_PhyWrite(XXgEthernet *InstancePtr, u32 PhyAddress,
 					XXGE_MDIO_CFG1_OFFSET) & XXGE_MDIO_CFG1_READY_MASK)) {
 		;
 	}
-#endif
 	printk("MDIO CFG1 %x = %x\n", XXGE_MDIO_CFG1_OFFSET, 
 			XXgEthernet_ReadReg(InstancePtr->Config.BaseAddress,
 				XXGE_MDIO_CFG1_OFFSET));

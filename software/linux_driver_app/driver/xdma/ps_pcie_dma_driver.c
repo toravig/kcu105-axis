@@ -426,9 +426,9 @@ static int ReadPCIState(void * pdev, PCIState * pcistate)
 		pcistate->LinkSpeed = (valw & 0x0003);
 		pcistate->LinkWidth = (valw & 0x03f0) >> 4;
 #ifdef USE_LATER
-		//	reg=XIo_In32(base+PCIE_CAP_REG);
-		//	linkUpCap= (reg>>4) & 0x1;
-		//	pcistate->LinkUpCap = linkUpCap;
+		reg=XIo_In32(base+PCIE_CAP_REG);
+		linkUpCap= (reg>>4) & 0x1;
+		pcistate->LinkUpCap = linkUpCap;
 #endif
 		/* Read MPS & MRRS */
 		pci_read_config_word(pdev, pos+PCI_EXP_DEVCTL, &valw);
@@ -514,7 +514,7 @@ static long xdma_dev_ioctl(struct file * filp,
 #if defined(ETH_APP) || defined(DDR_DESIGN)
 	int Status_Reg=0;
 
-	u64 base= ptr_dma_desc_temp->cntrl_func_virt_base_addr;
+	u64 base= (u64)ptr_dma_desc_temp->cntrl_func_virt_base_addr;
 #endif
 	/* Check cmd type and value */
 	if(_IOC_TYPE(cmd) != XPMON_MAGIC) return -ENOTTY;
@@ -2213,7 +2213,7 @@ int xlnx_alloc_queues(ps_pcie_dma_chann_desc_t *ptr_chann_desc,
 	}
 	//	ptr_chann_desc->cntxt_q_sz = sizeof(data_q_cntxt_t) * q_num_elements;
 
-#if 0
+#ifdef USE_LATER 
 	/* Initialize number of BDs that can be used */
 	if(ptr_chann_desc->dir == IN) 
 	{
@@ -2251,12 +2251,10 @@ EXPORT_SYMBOL(xlnx_alloc_queues);
 
 int xlnx_dealloc_queues(ps_pcie_dma_chann_desc_t *ptr_chann_desc)
 {
-	//	unsigned long flags;
 	int ret = XLNX_SUCCESS;
 	//TODO  complete this
 	printk(KERN_ERR"\n Deallocate Qs DMA Channel %d %p\n",ptr_chann_desc->chann_id, ptr_chann_desc);
 
-	//	spin_lock_bh(&ptr_chann_desc->channel_lock/*, flags*/);
 
 	/* Free the context array */
 	kfree(ptr_chann_desc->ptr_ctx);
@@ -2354,7 +2352,7 @@ inline int xlnx_data_frag_io(ps_pcie_dma_chann_desc_t *ptr_chan_desc,
 		ret = XLNX_DMA_CHANN_SW_ERR;
 		goto error_channel;
 	}
-#if 0
+#ifdef USE_LATER 
 	/* Check if we have BDs free */
 	if(ptr_chan_desc->num_free_bds == 0) 
 	{

@@ -13,7 +13,6 @@
 
 #include "../xdma/ps_pcie_dma_driver.h"
 #include "../xdma/ps_pcie_pf.h"
-//#include "ps_pcie_command.h"
 #include "xxgethernet.h"
 
 
@@ -112,18 +111,6 @@ ps_pcie_dma_desc_t *ptr_txapp_dma_desc = NULL;
 ps_pcie_dma_chann_desc_t *ptr_chan_s2c[PS_PCIE_NUM_DMA_CHANNELS] = {0};
 unsigned char *glb_buf[PS_PCIE_NUM_DMA_CHANNELS];
 
-/*
-   void  cbk_sratch_pad(struct _ps_pcie_dma_chann_desc *, unsigned int *ptr_host_2_card_data, unsigned int num_dwords_host_2_card)
-   {
-
-
-
-
-
-   }
-   */
-
-
 /*****************************************************************************/
 /**
  * This function returns the DMA base address to the user driver
@@ -140,14 +127,6 @@ unsigned char *glb_buf[PS_PCIE_NUM_DMA_CHANNELS];
  *****************************************************************************/
 void * DmaBaseAddress(int bar)
 {
-#if 0
-	if(DriverState != INITIALIZED)
-	{
-		log_verbose(KERN_ERR "DMA driver state %d - not ready\n", DriverState);
-		return NULL;
-	}
-#endif	
-
 	if((bar < 0) || (bar > 5)) {
 		log_verbose(KERN_ERR "Requested BAR %d is not valid\n", bar);
 		return NULL;
@@ -172,28 +151,20 @@ int DmaMac_ReadReg(int offset)
 
 void cbk_data_pump(struct _ps_pcie_dma_chann_desc *ptr_chann, void *data, unsigned int compl_bytes,unsigned short uid, unsigned int num_frags)
 {
-	static int cnt_tx=0;
 	int retval=0;
 	struct net_local *lp=netdev_priv(ndev);
 	struct sk_buff *skb=(struct sk_buff*)data;
 	struct sk_buff *new_skb;
 	unsigned int nfrags;
+	int ret=0; 
 	if(ptr_chann->chann_state == XLNX_DMA_CHANN_SATURATED)
 	{
 		printk(KERN_ERR "DMA CHANN ERRR ***\n");
 		ptr_chann->chann_state = XLNX_DMA_CHANN_NO_ERR;
 	}
 
-
-
-	//printk(KERN_ERR "%s :: CALLBACK INVOKED **** \n",__func__);
-	//printk(KERN_ERR "Bytes %d :: Channel %d \n",ptr_chann->chann_id,compl_bytes);
-
 	if(ptr_chann->dir==OUT)
 	{
-		//       printk(KERN_INFO"Skb Came freeing it ");
-		//printk(KERN_ERR "TX  CALLBACK");
-
 		nfrags = skb_shinfo(skb)->nr_frags +1;
 		free_num_q_elements = free_num_q_elements + nfrags;	
 		if (skb)
@@ -203,14 +174,12 @@ void cbk_data_pump(struct _ps_pcie_dma_chann_desc *ptr_chann, void *data, unsign
 	}
 	else
 	{
-		// printk(KERN_ERR "RX  CALLBACK");
 		skb_put(skb, compl_bytes);	/* Tell the skb how much data we got. */
 		skb->dev = ndev;
 
 		/* this routine adjusts skb->data to skip the header */
 		skb->protocol = eth_type_trans(skb, ndev);
 		skb->ip_summed = CHECKSUM_NONE;
-		int ret=0; 
 		ret=netif_rx(skb);	/* Send the packet upstream. */
 
 		if(ret!=NET_RX_SUCCESS)
@@ -218,100 +187,39 @@ void cbk_data_pump(struct _ps_pcie_dma_chann_desc *ptr_chann, void *data, unsign
 
 		new_skb = alloc_skb(XGMAC_RX_BUF_SIZE, GFP_ATOMIC);
 		if (new_skb == NULL) {
-			printk("Alloc SKB failed for %d\n");    
-			goto error;
+			printk("Alloc SKB failed for \n");    
 		}
-		retval = xlnx_data_frag_io(ptr_chann, new_skb->data, 
+		else {
 
-				VIRT_ADDR, 
+			retval = xlnx_data_frag_io(ptr_chann, new_skb->data, 
 
-				XGMAC_RX_BUF_SIZE,cbk_data_pump ,/*ptr_chann->num_pkts_io+*/1, true, /*OUT,*/ (void *)new_skb);
+					VIRT_ADDR, 
 
-		if(retval < XLNX_SUCCESS)
-		{
-			printk(KERN_ERR"\n- Context RX Q saturated %d\n");
+					XGMAC_RX_BUF_SIZE,cbk_data_pump ,/*ptr_chann->num_pkts_io+*/1, true, /*OUT,*/ (void *)new_skb);
+
+			if(retval < XLNX_SUCCESS)
+			{
+				printk(KERN_ERR"\n- Context RX Q saturated \n");
 
 
+			}
 		} 
 
 	}
 
-#if 0
-	if(ptr_chann->chann_state == XLNX_DMA_CNTXTQ_SATURATED || ptr_chann->chann_state == XLNX_DMA_CHANN_SATURATED)
-	{
-		/* Make the channel state as 'no error' */
-		ptr_chann->chann_state = XLNX_DMA_CHANN_NO_ERR;
-
-		/* Make task running */
-		//set_task_state(task, TASK_RUNNING);
-#ifdef PUMP_APP_DBG_PRNT
-		printk(KERN_ERR"\n --> Thread woken up\n");
-#endif
-		//schedule();
-		wake_up_process(task);
-	}
-	else
-	{
-		wake_up_process(task);
-	}
-
-	int retval;
-	if(ptr_chann->chann_state == XLNX_DMA_CNTXTQ_SATURATED || ptr_chann->chann_state == XLNX_DMA_CHANN_SATURATED)
-	{
-		/* Make the channel state as 'no error' */
-		ptr_chann->chann_state = XLNX_DMA_CHANN_NO_ERR;
-	}
-	printk(KERN_ERR "Waiting .. to send next ARP request \n");
-	//mdelay(1000*20);
-	if(cnt_tx>5)
-	{
-		printk(KERN_ERR "Exiting PUMP THREAD \n");	
-		return 0;
-	}
-	printk(KERN_ERR " :: xlnx_data_frag_io :: %d \n",cnt_tx++);
-	retval = xlnx_data_frag_io(ptr_chann, glb_buf[ptr_chann->chann_id], 
-
-			VIRT_ADDR, 
-
-			FRAG_SZ,cbk_data_pump ,/*ptr_chann->num_pkts_io+*/1, true, /*OUT,*/ (void*)current);
-	if(retval < XLNX_SUCCESS)
-	{
-		int state = ptr_chann->chann_state;
-
-		//spin_unlock_irqrestore(&chann->channel_lock, flags);
-#if 1//def PUMP_APP_DBG_PRNT
-		printk(KERN_ERR"\n - Failed::::::Buffer allocated transmit %d\n", retval);
-#endif
-		if(state == XLNX_DMA_CNTXTQ_SATURATED || state == XLNX_DMA_CHANN_SATURATED) 
-		{
-#if 1//def PUMP_APP_DBG_PRNT
-			printk(KERN_ERR"\n - Context Q saturated %d\n",state);
-#endif
-		}
-	}
-
-
-
-#endif
-error:
-	return -1;
 }
 
 static int xenet_send(struct sk_buff *skb, struct net_device *dev)
 {
 	int retval;
 	struct net_local *lp;
-	unsigned int counter = 0; 
-	unsigned int num_pkts = 0;
 	unsigned long flags;
-	static int cnt_tx=0;
-	lp = netdev_priv(dev);
 	unsigned int nfrags;
 	skb_frag_t *frag;
 	void *virt_addr;
 	unsigned int len;
-	//glb_buf[chann->chann_id] = skb->data;
 
+	lp = netdev_priv(dev);
 	//spin_lock_bh(&lp->ptr_dma_chan_tx->channel_lock);
 	//	spin_lock(&lp->ptr_dma_chan_tx->channel_lock);
 	spin_lock_irqsave(&lp->ptr_dma_chan_tx->channel_lock,flags);
@@ -319,27 +227,19 @@ static int xenet_send(struct sk_buff *skb, struct net_device *dev)
 	if(nfrags > (free_num_q_elements - 1))
 	{
 		netif_stop_queue(dev);
-		printk("####STOP ETH1 ###\n");
 		//	spin_unlock_bh(&lp->ptr_dma_chan_tx->channel_lock);
 		spin_unlock_irqrestore(&lp->ptr_dma_chan_tx->channel_lock, flags);
 		return NETDEV_TX_BUSY;
 	}
 	if(nfrags == 1)
 	{
-		//printk(KERN_ERR "Number of frags is %d :: size %d \n",nfrags,skb->len);
-
-
 		//spin_lock_bh(&lp->ptr_dma_chan_tx->channel_lock);
 
-
 		retval = xlnx_data_frag_io(lp->ptr_dma_chan_tx, skb->data,  VIRT_ADDR, 
-
 				skb->len,cbk_data_pump ,/*num_pkts+1*/1, true, /*OUT,*/(void *) skb);
 		if(retval < XLNX_SUCCESS) 
 		{
-			printk(KERN_ERR"\n - Context Q saturated %d\n");
-
-
+			printk(KERN_ERR"\n - Context Q saturated \n");
 		}
 		//	spin_unlock_bh(&lp->ptr_dma_chan_tx->channel_lock);
 
@@ -347,7 +247,6 @@ static int xenet_send(struct sk_buff *skb, struct net_device *dev)
 	else 
 	{
 		int i=0; 
-		//			 printk(KERN_ERR"##### Eth1 Frags %d #####\n",nfrags);			  
 		//	 spin_lock_bh(&lp->ptr_dma_chan_tx->channel_lock);
 		frag = &skb_shinfo(skb)->frags[0];
 		for(i=0;i< nfrags;i++)
@@ -355,12 +254,11 @@ static int xenet_send(struct sk_buff *skb, struct net_device *dev)
 			if(i == 0)
 			{
 				len=skb_headlen(skb);
-#if 0
+#ifdef DEBUG_NORMAL
 				printk(KERN_ERR"\n########################################\n");
 				printk(KERN_ERR"Eth1 Frag %d Length %d Data %x %x %x %x %x %x %x %x ",i,len,skb->data[0],skb->data[1],skb->data[2],skb->data[3],skb->data[4],skb->data[5],skb->data[6],skb->data[7]);
 				printk(KERN_ERR"\n########################################\n");
 #endif			
-				//     printk(KERN_ERR "Number of frags is %d :: size %d \n",nfrags,skb->len);
 				//			spin_lock_bh(&lp->ptr_dma_chan_tx->channel_lock);
 				retval = xlnx_data_frag_io(lp->ptr_dma_chan_tx, skb->data,  VIRT_ADDR, 
 						len,cbk_data_pump ,/*num_pkts+1*/1, false, /*OUT,*/(void *) skb);
@@ -375,17 +273,9 @@ static int xenet_send(struct sk_buff *skb, struct net_device *dev)
 			else
 			{
 				len =  skb_frag_size(frag);
-				//#if LINUX_VERSION_CODE <= KERNEL_VERSION(3, 1, 0)
-				//              virt_addr =
-				//                (void *) page_address(frag->page) + frag->page_offset;
-				//#else
-				//              virt_addr =
-				//                (void *) page_address(skb_frag_page(frag)) + frag->page_offset;
-				//#endif
 
-				//				   printk(KERN_ERR"####Length %d %d #####\n",len,i)
 				virt_addr = skb_frag_address(frag);
-#if 0
+#ifdef DEBUG_NORMAL
 				printk(KERN_ERR"\n########################################\n");
 				printk(KERN_ERR"Eth1 Frag %d Length %d Data %x %x %x %x %x %x %x %x ",i,len,*((int *)(virt_addr)),*((int *)(virt_addr)+ 1),*((int *)(virt_addr)+ 2),*((int *)(virt_addr)+ 3),*((int *)(virt_addr)+4),*((int *)(virt_addr)+5 ),*((int *)(virt_addr)+6),*((int *)(virt_addr)+7 ));
 				printk(KERN_ERR"\n########################################\n");
@@ -416,20 +306,15 @@ static int xenet_send(struct sk_buff *skb, struct net_device *dev)
 
 	}
 	free_num_q_elements= free_num_q_elements - nfrags;
-#ifdef PUMP_APP_DBG_PRNT
-	//printk(KERN_ERR"\n --> Thread Pumping data\n");
-#endif
-	//	printk(KERN_ERR"\n --> Thread Pumping data\n");
 
 
 	//spin_unlock_bh(&lp->ptr_dma_chan_tx->channel_lock);					   
 	//		spin_unlock(&lp->ptr_dma_chan_tx->channel_lock);					   
 	spin_unlock_irqrestore(&lp->ptr_dma_chan_tx->channel_lock, flags);
-
 	return 0;
 }
 
-#if 0
+#ifdef USE_LATER
 
 int check_link_state(struct net_device *dev)
 {
@@ -701,10 +586,7 @@ static void poll_gmii(unsigned long data)
 static int xenet_open(struct net_device *dev)
 {
 	struct net_local *lp;
-	u8 mac_addr[6];
 	u32 Options;
-	int netif_carrier;
-	int link=0;   
 	printk(KERN_INFO "calling xenet_open\n");
 
 	/*
@@ -713,21 +595,10 @@ static int xenet_open(struct net_device *dev)
 	 * really care.
 	 */
 	netif_stop_queue(dev);
-
-
-
-
-
-
-
-
 	lp = netdev_priv(dev);
 
-	// memcpy(dev->dev_addr,mac_addr, sizeof(mac_addr));		 
-	// XXgEthernet_GetMacAddress(XXgEthernet *InstancePtr, void *AddressPtr)
 
 	//Intialize MAC here 
-#if 1
 	_XXgEthernet_Stop(&lp->Emac);
 	/* Set the MAC address each time opened. */
 	if (_XXgEthernet_SetMacAddress(&lp->Emac, dev->dev_addr) != XST_SUCCESS) {
@@ -749,9 +620,9 @@ static int xenet_open(struct net_device *dev)
 #endif    
 	Options |= XXGE_TRANSMITTER_ENABLE_OPTION;
 	Options |= XXGE_RECEIVER_ENABLE_OPTION;
-#if XXGE_AUTOSTRIPPING
-	Options |= XXGE_FCS_STRIP_OPTION;
-#endif
+	//#if XXGE_AUTOSTRIPPING
+	//	Options |= XXGE_FCS_STRIP_OPTION;
+	//#endif
 
 	(int) _XXgEthernet_SetOptions(&lp->Emac, Options);
 	Options = XXgEthernet_GetOptions(&lp->Emac);
@@ -777,7 +648,6 @@ static int xenet_open(struct net_device *dev)
 	spin_lock_init(&sentQueueSpin);
 	spin_lock_init(&receivedQueueSpin);
 
-#endif
 
 	return 0;
 }
@@ -807,7 +677,7 @@ static int xenet_close(struct net_device *dev)
 
 static int xenet_change_mtu(struct net_device *dev, int new_mtu)
 {
-	u32 SetMtu=0; 
+	//	u32 SetMtu=0; 
 #ifdef CONFIG_XILINX_GIGE_VLAN
 	int head_size = XXGE_HDR_VLAN_SIZE;
 #else
@@ -900,17 +770,14 @@ static void xenet_set_netdev_ops(struct net_device *ndev, struct net_device_ops 
 static int xgmac_nwl_rx_init(struct net_device  *ndev)
 {
 	int retval = 0;
-	int i;
 	unsigned int q_num_elements = NUM_Q_ELEM;
 	unsigned int data_q_addr_hi;
 	unsigned int data_q_addr_lo;
 	unsigned int sta_q_addr_hi;
 	unsigned int sta_q_addr_lo;
-	char name_buf[50];
 	struct net_local  *lp;
 	struct sk_buff *skb;
-	unsigned long flags;
-
+	int i=0;
 
 	platform_t pfrom = HOST;
 
@@ -930,7 +797,7 @@ static int xgmac_nwl_rx_init(struct net_device  *ndev)
 			IN, &lp->ptr_dma_chan_rx,NULL);
 	if(retval < XLNX_SUCCESS) 
 	{
-		printk(KERN_ERR"\n - Could not get s2c %d channel error %d\n", i,retval);
+		printk(KERN_ERR"\n - Could not get s2c error %d\n", retval);
 		goto channel_ack_failed;
 	}
 
@@ -941,7 +808,7 @@ static int xgmac_nwl_rx_init(struct net_device  *ndev)
 			q_num_elements);
 	if(retval < XLNX_SUCCESS) 
 	{
-		printk(KERN_ERR"\n - Could not allocate Qs for s2c %d channel %d\n",i, retval);
+		printk(KERN_ERR"\n - Could not allocate Qs for s2c  %d\n", retval);
 		goto channel_q_alloc0_failed;
 	}
 
@@ -951,7 +818,7 @@ static int xgmac_nwl_rx_init(struct net_device  *ndev)
 			sta_q_addr_hi,sta_q_addr_lo,q_num_elements, 0);
 	if(retval < XLNX_SUCCESS) 
 	{
-		printk(KERN_ERR"\n - Could not activate s2c %d channel %d\n", i,retval);
+		printk(KERN_ERR"\n - Could not activate s2c  %d\n",retval);
 		goto channel_act_failed;
 	}
 
@@ -962,7 +829,7 @@ static int xgmac_nwl_rx_init(struct net_device  *ndev)
 	{
 		skb = alloc_skb(XGMAC_RX_BUF_SIZE, GFP_ATOMIC);
 		if (skb == NULL) {
-			printk("Alloc SKB failed for %d\n");    
+			printk("Alloc SKB failed \n");    
 			goto error;
 		}		
 		retval = xlnx_data_frag_io(lp->ptr_dma_chan_rx, skb->data,  VIRT_ADDR, 
@@ -1001,7 +868,6 @@ static int xgmac_nwl_tx_init(struct net_device *ndev)
 	unsigned int data_q_addr_lo;
 	unsigned int sta_q_addr_hi;
 	unsigned int sta_q_addr_lo;
-	char name_buf[50];
 	struct net_local *lp;
 
 #ifdef XILINX_PCIE_EP
@@ -1069,7 +935,7 @@ channel_q_alloc0_failed:
 	return -1;
 }
 
-#if  0
+#ifdef USE_LATER
 void xenet_getmacaddr(struct net_device *ndev )
 {
 
@@ -1096,15 +962,13 @@ void xenet_getmacaddr(struct net_device *ndev )
 int xgenet_init(void)
 {
 	int retval = 0;
-	int i;
 	struct net_local *lp = NULL;
 	u8 mac_addr[6];
 	int rc=0;
 
-	platform_t pfrom = HOST;
 	XXgEthernet_Config Temac_Config;
 
-	u64  net_path_vbaseaddr;
+	u64 net_path_vbaseaddr;
 
 
 	/*
@@ -1143,12 +1007,10 @@ int xgenet_init(void)
 	xgmac_nwl_tx_init(ndev);
 
 	net_path_vbaseaddr = (ptr_txapp_dma_desc->cntrl_func_virt_base_addr) + NW_PATH1_OFFSET;
-	printk("\n ##%x  %x ## \n \n ",ptr_txapp_dma_desc->cntrl_func_virt_base_addr,*(ptr_txapp_dma_desc->cntrl_func_virt_base_addr + NW_PATH1_OFFSET +XXGE_RCW1_OFFSET));
 
 	/* Setup the Config structure for the XXgEthernet_CfgInitialize() call. */
 	Temac_Config.BaseAddress =  net_path_vbaseaddr;
-	//return 0;
-#ifdef X86_64
+	#ifdef X86_64
 	if (XXgEthernet_CfgInitialize(&lp->Emac, &Temac_Config,  net_path_vbaseaddr) != XST_SUCCESS) 
 	{
 #else
@@ -1156,133 +1018,128 @@ int xgenet_init(void)
 		{
 #endif	
 			printk(KERN_ERR "xgbeth_axi: Could not initialize device.\n");
-			//    rc = -ENODEV;
 			goto error;
 		}
 
-
-		/* Default MAC address assignment */
-		mac_addr[0]=0xAA;
-		mac_addr[1]=0xBB;
-		mac_addr[2]=0xCC;
-		mac_addr[3]=0xDD;
-		mac_addr[4]=0xEE;
-		mac_addr[5]=0xFF;
+	/* Default MAC address assignment */
+	mac_addr[0]=0xAA;
+	mac_addr[1]=0xBB;
+	mac_addr[2]=0xCC;
+	mac_addr[3]=0xDD;
+	mac_addr[4]=0xEE;
+	mac_addr[5]=0xFF;
 #ifdef USE_NW_PATH0
-		mac_addr[1]=0xBB;
-#else USE_NW_PATH1
-		mac_addr[1]=0x00;
+	mac_addr[1]=0xBB;
+#else
+	mac_addr[1]=0x00;
 #endif
 
-		if (_XXgEthernet_SetMacAddress(&lp->Emac, mac_addr) != XST_SUCCESS) {
-			printk(KERN_ERR "Could not set MAC address.\n");
-			//   rc = -EIO;
-			goto error;
-		}
+	if (_XXgEthernet_SetMacAddress(&lp->Emac, mac_addr) != XST_SUCCESS) {
+		printk(KERN_ERR "Could not set MAC address.\n");
+		goto error;
+	}
 
 #ifdef DEBUG_NORMAL
-		printk("**Set the MAC adress in init_bottom**\n");
+	printk("**Set the MAC adress in init_bottom**\n");
 #endif
 
-		_XXgEthernet_GetMacAddress(&lp->Emac,ndev->dev_addr);
+	_XXgEthernet_GetMacAddress(&lp->Emac,ndev->dev_addr);
 
-		printk("addr_len is %d, perm_addr[0] is %x, [1] = %x, [2] = %x, [3] = %x, perm_addr[4] is %x, [5] = %x\n", 
-				ndev->addr_len, ndev->dev_addr[0], ndev->dev_addr[1], ndev->dev_addr[2],
-				ndev->dev_addr[3], ndev->dev_addr[4], ndev->dev_addr[5]);
+	printk("addr_len is %d, perm_addr[0] is %x, [1] = %x, [2] = %x, [3] = %x, perm_addr[4] is %x, [5] = %x\n", 
+			ndev->addr_len, ndev->dev_addr[0], ndev->dev_addr[1], ndev->dev_addr[2],
+			ndev->dev_addr[3], ndev->dev_addr[4], ndev->dev_addr[5]);
 
 
 #ifdef ENABLE_JUMBO    
-		lp->max_frame_size = XXGE_MAX_JUMBO_FRAME_SIZE;
+	lp->max_frame_size = XXGE_MAX_JUMBO_FRAME_SIZE;
 #else
-		lp->max_frame_size = 1600;
+	lp->max_frame_size = 1600;
 #endif
-		log_verbose(KERN_INFO "MTU size is %d\n", ndev->mtu);
-		if (ndev->mtu > XXGE_JUMBO_MTU)
-			ndev->mtu = XXGE_JUMBO_MTU;
-		log_verbose(KERN_INFO "MTU size is %d\n", ndev->mtu);
+	log_verbose(KERN_INFO "MTU size is %d\n", ndev->mtu);
+	if (ndev->mtu > XXGE_JUMBO_MTU)
+		ndev->mtu = XXGE_JUMBO_MTU;
+	log_verbose(KERN_INFO "MTU size is %d\n", ndev->mtu);
 
 
-		/** Scan to find the PHY */
-		lp->xgmii_addr = XXGE_PHY_ADDRESS;
-		log_verbose("xgmii_addr is %x\n", lp->xgmii_addr);
-
-
-
-		xenet_set_netdev_ops(ndev, &xenet_netdev_ops);
-		ndev->flags &= ~IFF_MULTICAST;
-		ndev->features = NETIF_F_SG | NETIF_F_FRAGLIST;
-
-		rc = register_netdev(ndev);
-		if (rc) {
-			printk(KERN_ERR
-					"%s: Cannot register net device, aborting.\n", ndev->name);
-			goto error; /* rc is already set here... */
-		}
+	/** Scan to find the PHY */
+	lp->xgmii_addr = XXGE_PHY_ADDRESS;
+	log_verbose("xgmii_addr is %x\n", lp->xgmii_addr);
 
 
 
+	xenet_set_netdev_ops(ndev, &xenet_netdev_ops);
+	ndev->flags &= ~IFF_MULTICAST;
+	ndev->features = NETIF_F_SG | NETIF_F_FRAGLIST;
 
-		return retval;
+	rc = register_netdev(ndev);
+	if (rc) {
+		printk(KERN_ERR
+				"%s: Cannot register net device, aborting.\n", ndev->name);
+		goto error; /* rc is already set here... */
+	}
+
+
+	return retval;
 
 
 
 error:
-		if (ndev) {
-			free_netdev(ndev);
-		}
-
+	if (ndev) {
+		free_netdev(ndev);
 	}
+	return -1;
+}
 
-	static void xgenet_cleanup(void)
-	{
-		//Deregister Dma channels here 
+static void xgenet_cleanup(void)
+{
+	//Deregister Dma channels here 
 
-		struct net_local *lp;
+	struct net_local *lp;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 28)
-		lp = netdev_priv(ndev);
+	lp = netdev_priv(ndev);
 #else
-		lp = (struct net_local *) ndev->priv;	
+	lp = (struct net_local *) ndev->priv;	
 #endif	
 
 
 
-		//Tx cHannel
-		/* Stop the IOs over channel */
-		xlnx_deactivate_dma_channel(lp->ptr_dma_chan_tx);
-		//xlnx_stop_channel_IO(ptr_chan_s2c, true);
-		xlnx_dealloc_queues(lp->ptr_dma_chan_tx);
-		//TxAux Channel
-		//	xlnx_deactivate_dma_channel(ptr_Auxchan_s2c);
-		//	xlnx_stop_channel_IO(ptr_TxAuxapp_dma_desc, true);
-		//	xlnx_dealloc_queues(ptr_Auxchan_s2c);
+	//Tx cHannel
+	/* Stop the IOs over channel */
+	xlnx_deactivate_dma_channel(lp->ptr_dma_chan_tx);
+	//xlnx_stop_channel_IO(ptr_chan_s2c, true);
+	xlnx_dealloc_queues(lp->ptr_dma_chan_tx);
+	//TxAux Channel
+	//	xlnx_deactivate_dma_channel(ptr_Auxchan_s2c);
+	//	xlnx_stop_channel_IO(ptr_TxAuxapp_dma_desc, true);
+	//	xlnx_dealloc_queues(ptr_Auxchan_s2c);
 
-		//Rx Channel
+	//Rx Channel
 
-		xlnx_deactivate_dma_channel(lp->ptr_dma_chan_rx);
-		//	xlnx_stop_channel_IO(ptr_rxapp_dma_desc, true);
-		xlnx_dealloc_queues(lp->ptr_dma_chan_rx);
+	xlnx_deactivate_dma_channel(lp->ptr_dma_chan_rx);
+	//	xlnx_stop_channel_IO(ptr_rxapp_dma_desc, true);
+	xlnx_dealloc_queues(lp->ptr_dma_chan_rx);
 
-		//Rx Aux Channel	
-		//	xlnx_deactivate_dma_channel(ptr_rxauxchan_s2c);
-		//	xlnx_stop_channel_IO(ptr_rxauxapp_dma_desc, true);
-		//	xlnx_dealloc_queues(ptr_rxauxchan_s2c);
-		//
-
-
-		unregister_netdev(ndev);
-		if(ndev != NULL)
-			free_netdev(ndev);
-
-	}
+	//Rx Aux Channel	
+	//	xlnx_deactivate_dma_channel(ptr_rxauxchan_s2c);
+	//	xlnx_stop_channel_IO(ptr_rxauxapp_dma_desc, true);
+	//	xlnx_dealloc_queues(ptr_rxauxchan_s2c);
+	//
 
 
-	module_init(xgenet_init);
-	module_exit(xgenet_cleanup);
+	unregister_netdev(ndev);
+	if(ndev != NULL)
+		free_netdev(ndev);
 
-	MODULE_AUTHOR("Xilinx, Inc.");
-	MODULE_DESCRIPTION(DRIVER_DESCRIPTION);
-	MODULE_LICENSE("GPL");
-	MODULE_VERSION(DRIVER_VERSION);
+}
+
+
+module_init(xgenet_init);
+module_exit(xgenet_cleanup);
+
+MODULE_AUTHOR("Xilinx, Inc.");
+MODULE_DESCRIPTION(DRIVER_DESCRIPTION);
+MODULE_LICENSE("GPL");
+MODULE_VERSION(DRIVER_VERSION);
 
 
 

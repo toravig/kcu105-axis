@@ -259,36 +259,12 @@ getBuffInfo (BufferInfoQue * bQue, BufferInfo * buff)
 
 void cbk_data_pump(struct _ps_pcie_dma_chann_desc *ptr_chann, void *data, unsigned int compl_bytes,unsigned short uid, unsigned int num_frags)
 {
-	//struct task_struct* task = (struct task_struct*)data;
 	PktBuf * pbuf;
 	int i=0;
 	unsigned int flags;
 	static int pktSize;
 	unsigned char *usrAddr = NULL;
 	BufferInfo tempBuffInfo;
-
-
-#if 0
-	if(ptr_chann->chann_state == XLNX_DMA_CNTXTQ_SATURATED || ptr_chann->chann_state == XLNX_DMA_CHANN_SATURATED)
-	{
-		/* Make the channel state as 'no error' */
-		ptr_chann->chann_state = XLNX_DMA_CHANN_NO_ERR;
-
-		/* Make task running */
-		//set_task_state(task, TASK_RUNNING);
-#ifdef PUMP_APP_DBG_PRNT
-		printk(KERN_ERR"\n --> Thread woekn up\n");
-#endif
-		//schedule();
-		wake_up_process(task);
-	}
-	else
-	{
-		wake_up_process(task);
-	}
-#else
-	int retval;
-	unsigned int burst_fill = PKT_YIELD_CNT_PER_CHANN;
 	if(ptr_chann->chann_state == XLNX_DMA_CNTXTQ_SATURATED || ptr_chann->chann_state == XLNX_DMA_CHANN_SATURATED)
 	{
 		/* Make the channel state as 'no error' */
@@ -300,7 +276,7 @@ void cbk_data_pump(struct _ps_pcie_dma_chann_desc *ptr_chann, void *data, unsign
 		{
 			pbuf = Dqueue[ReadIndex];
 			flags = pbuf->flags;
-			dma_unmap_page(ptr_chann->ptr_dma_desc->dev,pbuf->pktBuf,pbuf->size,DMA_TO_DEVICE);
+			dma_unmap_page(ptr_chann->ptr_dma_desc->dev,(dma_addr_t)pbuf->pktBuf,pbuf->size,DMA_TO_DEVICE);
 			if(pbuf->pageAddr)
 				page_cache_release( (struct page *)pbuf->pageAddr);
 
@@ -331,46 +307,6 @@ void cbk_data_pump(struct _ps_pcie_dma_chann_desc *ptr_chann, void *data, unsign
 		}
 
 	}
-
-
-#if 0
-
-fill_another:
-	//printk(KERN_ERR"\n --> CBK Tx channel\n");
-	retval = xlnx_data_frag_io(ptr_chann, glb_buf[ptr_chann->chann_id], 
-
-			addr_typ_pmp[ptr_chann->chann_id],
-			FRAG_SZ,cbk_data_pump ,/*ptr_chann->num_pkts_io+*/1, true, /*OUT,*/ (void*)current);
-	if(retval < XLNX_SUCCESS)
-	{
-		int state = ptr_chann->chann_state;
-
-		//spin_unlock_irqrestore(&chann->channel_lock, flags);
-#if 0//def PUMP_APP_DBG_PRNT
-		printk(KERN_ERR"\n - Failed::::::Buffer allocated transmit %d\n", retval);
-#endif
-		if(state == XLNX_DMA_CNTXTQ_SATURATED || state == XLNX_DMA_CHANN_SATURATED) 
-		{
-#if 0//def PUMP_APP_DBG_PRNT
-			printk(KERN_ERR"\n - Context Q saturated %d\n",state);
-#endif
-		}
-
-		ptr_chann->chann_state = XLNX_DMA_CHANN_NO_ERR;
-	}
-	else
-	{
-		if(/*burst_fill*/1) 
-		{
-			burst_fill--;
-			goto fill_another;
-		}
-	}
-
-
-
-#endif
-#endif
 }
 
 
@@ -380,7 +316,6 @@ fill_another:
 
 void cbk_data_rxpump(struct _ps_pcie_dma_chann_desc *ptr_chann, void *data, unsigned int compl_bytes,unsigned short uid, unsigned int num_frags)
 {
-	//struct task_struct* task = (struct task_struct*)data;
 	PktBuf * pbuf;
 	int i=0;
 	unsigned int flags;
@@ -388,38 +323,12 @@ void cbk_data_rxpump(struct _ps_pcie_dma_chann_desc *ptr_chann, void *data, unsi
 	unsigned char *usrAddr = NULL;
 	BufferInfo tempBuffInfo;
 	static int  noPages =0 ;
-
-
-#if 0
-	if(ptr_chann->chann_state == XLNX_DMA_CNTXTQ_SATURATED || ptr_chann->chann_state == XLNX_DMA_CHANN_SATURATED)
-	{
-		/* Make the channel state as 'no error' */
-		ptr_chann->chann_state = XLNX_DMA_CHANN_NO_ERR;
-
-		/* Make task running */
-		//set_task_state(task, TASK_RUNNING);
-#ifdef PUMP_APP_DBG_PRNT
-		printk(KERN_ERR"\n --> Thread woekn up\n");
-#endif
-		//schedule();
-		wake_up_process(task);
-	}
-	else
-	{
-		wake_up_process(task);
-	}
-#else
-	int retval;
-	unsigned int burst_fill = PKT_YIELD_CNT_PER_CHANN;
 	if(ptr_chann->chann_state == XLNX_DMA_CNTXTQ_SATURATED || ptr_chann->chann_state == XLNX_DMA_CHANN_SATURATED)
 	{
 		/* Make the channel state as 'no error' */
 		ptr_chann->chann_state = XLNX_DMA_CHANN_NO_ERR;
 	}
-	//printk(" %s data %x frags %d   ",__FUNCTION__,data,num_frags);
 	//  rx_channel_num_empty_bds += num_frags;	
-
-#if  1
 
 	for(i=0; i< num_frags; i++)
 	{
@@ -460,70 +369,15 @@ void cbk_data_rxpump(struct _ps_pcie_dma_chann_desc *ptr_chann, void *data, unsi
 
 	}
 
-	//	 kfree(cachePages);
-
-	//    for(i=0; i<num_frags; i++) {
-	//       kfree(pkts[i]);
-	//    }
-	//   kfree(pkts);
-
-
-
-#endif	
-
-#if 0
-
-fill_another:
-	//printk(KERN_ERR"\n --> CBK Tx channel\n");
-	retval = xlnx_data_frag_io(ptr_chann, glb_buf[ptr_chann->chann_id], 
-
-			addr_typ_pmp[ptr_chann->chann_id],
-			FRAG_SZ,cbk_data_pump ,/*ptr_chann->num_pkts_io+*/1, true, /*OUT,*/ (void*)current);
-	if(retval < XLNX_SUCCESS)
-	{
-		int state = ptr_chann->chann_state;
-
-		//spin_unlock_irqrestore(&chann->channel_lock, flags);
-#if 0//def PUMP_APP_DBG_PRNT
-		printk(KERN_ERR"\n - Failed::::::Buffer allocated transmit %d\n", retval);
-#endif
-		if(state == XLNX_DMA_CNTXTQ_SATURATED || state == XLNX_DMA_CHANN_SATURATED) 
-		{
-#if 0//def PUMP_APP_DBG_PRNT
-			printk(KERN_ERR"\n - Context Q saturated %d\n",state);
-#endif
-		}
-
-		ptr_chann->chann_state = XLNX_DMA_CHANN_NO_ERR;
-	}
-	else
-	{
-		if(/*burst_fill*/1) 
-		{
-			burst_fill--;
-			goto fill_another;
-		}
-	}
-
-
-
-#endif
-#endif
 }
 
-#if 0
+#ifdef USE_LATER
 void cbk_data_rxaux(struct _ps_pcie_dma_chann_desc *ptr_chann, void *data, unsigned int compl_bytes,unsigned short uid, unsigned int num_frags)
 {
 	struct task_struct* task = (struct task_struct*)data;
 	int retval;
 	unsigned int i;
 	unsigned int packet_size;
-
-	//printk(KERN_ERR"\n --> Channel %d User data %p Num bytes %d User id %x Packet id %d Direction %d Number of frags %d",
-	//	   ptr_chann->chann_id, data, compl_bytes, uid, ptr_chann->num_pkts_io, (unsigned int)ptr_chann->dir, num_frags);
-
-
-
 	if(ptr_chann->chann_state == XLNX_DMA_CNTXTQ_SATURATED || ptr_chann->chann_state == XLNX_DMA_CHANN_SATURATED)
 	{
 		/* Make the channel state as 'no error' */
@@ -532,36 +386,9 @@ void cbk_data_rxaux(struct _ps_pcie_dma_chann_desc *ptr_chann, void *data, unsig
 
 
 	//	rx_auxchannel_num_empty_bds[ptr_chann->chann_id] += num_frags;
-	//   printk("**");
 	ptr_chann->bds_freed += num_frags;
 	ptr_chann->cbk_called++;
-#if 0
-	if(rx_channel_stalled[ptr_chann->chann_id] == true) 
-	{
-		/* Make task running */
-		rx_channel_stalled[ptr_chann->chann_id] = false;
-#ifdef RX_APP_DBG_PRNT
-		printk(KERN_ERR"\n --> Thread woekn up %d\n",ptr_chann->chann_id);
-#endif
-		wake_up_process(task);
-	}
-	else
-	{
-		wake_up_process(task);
-	}
-#else
-	/* TODO  This should work debug hang!!*/
-	//printk(KERN_ERR"\n --> Pump next rx frag chann %d\n",ptr_chann->chann_id);
 
-#if 1
-#if 0
-	if((ptr_chann->num_pkts_io % (NUM_Q_ELEM/2))) 
-	{
-		return;
-	}
-	else
-		for(i = 0; i < (NUM_Q_ELEM/2);i++) 
-#endif
 		{
 			unsigned int burst_fill = num_frags;
 fill_another:
@@ -577,14 +404,8 @@ fill_another:
 					int state = ptr_chann->chann_state;
 
 					//spin_unlock_irqrestore(&chann->channel_lock, flags);
-#if 0//def RX_APP_DBG_PRNT
-					printk(KERN_ERR"\n - Failed::::::Buffer allocated rx %d\n", retval);
-#endif
 					if(state == XLNX_DMA_CNTXTQ_SATURATED || state == XLNX_DMA_CHANN_SATURATED) 
 					{
-#if 0//def RX_APP_DBG_PRNT
-						printk(KERN_ERR"\n - Context Q saturated %d\n",state);
-#endif
 					}
 
 					ptr_chann->chann_state = XLNX_DMA_CHANN_NO_ERR;
@@ -601,9 +422,6 @@ fill_another:
 				}
 			}
 		}
-#endif
-
-#endif
 
 }
 #endif
@@ -611,11 +429,6 @@ fill_another:
 void cbk_data_txaux(struct _ps_pcie_dma_chann_desc *ptr_chann, void *data, unsigned int compl_bytes,unsigned short uid, unsigned int num_frags)
 {
 	int retval;
-
-	//printk(KERN_ERR"\n --> Channel %d User data %p Num bytes %d User id %x Packet id %d Direction %d Number of frags %d",
-	//	   ptr_chann->chann_id, data, compl_bytes, uid, ptr_chann->num_pkts_io, (unsigned int)ptr_chann->dir, num_frags);
-
-
 
 	if(ptr_chann->chann_state == XLNX_DMA_CNTXTQ_SATURATED || ptr_chann->chann_state == XLNX_DMA_CHANN_SATURATED)
 	{
@@ -628,13 +441,6 @@ void cbk_data_txaux(struct _ps_pcie_dma_chann_desc *ptr_chann, void *data, unsig
 
 	ptr_chann->bds_freed += num_frags;
 	ptr_chann->cbk_called++;
-#if 1
-
-
-	/* TODO  This should work debug hang!!*/
-	//printk(KERN_ERR"\n --> Pump next rx frag chann %d\n",ptr_chann->chann_id);
-
-#if 1
 	{
 		unsigned int burst_fill = num_frags;
 fill_another:
@@ -646,14 +452,8 @@ fill_another:
 			int state = ptr_chann->chann_state;
 
 			//spin_unlock_irqrestore(&chann->channel_lock, flags);
-#if 0//def RX_APP_DBG_PRNT
-			printk(KERN_ERR"\n - Failed::::::Buffer allocated rx %d\n", retval);
-#endif
 			if(state == XLNX_DMA_CNTXTQ_SATURATED || state == XLNX_DMA_CHANN_SATURATED) 
 			{
-#if 0//def RX_APP_DBG_PRNT
-				printk(KERN_ERR"\n - Context Q saturated %d\n",state);
-#endif
 			}
 
 			ptr_chann->chann_state = XLNX_DMA_CHANN_NO_ERR;
@@ -668,9 +468,6 @@ fill_another:
 
 		}
 	}
-#endif
-
-#endif
 
 }
 
@@ -721,21 +518,6 @@ static int DmaSetupTransmit( int num ,const char __user * buffer, size_t length)
 			printk(KERN_ERR "Error: unable to allocate memory for cachePages\n");
 			return -1;
 		}
-
-		//	memset(cachePages, 0, sizeof(allocPages * sizeof(struct page*)) );
-
-#if 0	
-		down_read(&(current->mm->mmap_sem));
-		status = get_user_pages(current,        // current process id
-				current->mm,                // mm of current process
-				(unsigned long)buffer,      // user buffer
-				allocPages,
-				WRITE_TO_CARD,
-				0,                          /* don't force */
-				cachePages,
-				NULL);
-		up_read(&current->mm->mmap_sem);
-#endif
 
 		status = get_user_pages_fast((unsigned long)buffer,	allocPages,WRITE_TO_CARD,cachePages);
 
@@ -829,9 +611,6 @@ static int DmaSetupTransmit( int num ,const char __user * buffer, size_t length)
 				if(WriteIndex >= NUM_Q_ELEM)
 					WriteIndex=0;
 				tx_channel_num_empty_bds[chann->chann_id]--;
-
-				//	 kfree(cachePages);
-
 				spin_unlock_irqrestore(&chann->channel_lock, flags);
 				//	spin_unlock(&chann->channel_lock);
 			}
@@ -845,27 +624,12 @@ static int DmaSetupTransmit( int num ,const char __user * buffer, size_t length)
 	}
 	else 
 	{
-
-		// printk("No Room for Pkts BD full \n");
-		//		for(j=0; j<allocPages; j++)
-		//			page_cache_release(cachePages[j]);
-
-		//		kfree(cachePages);
-		//	kfree(pkts);
-		//printk("#");
-
 		return -1; 
 	}
 
 	allocPages = j;           // actually used pages
 
 	kfree(cachePages);
-
-	//  for(j=0; j<allocPages; j++) {
-	//      kfree(pkts[j]);
-	//  }
-	//  kfree(pkts);
-
 	return total;
 }
 
@@ -1008,10 +772,7 @@ static int DmaSetupReceive( int num ,const char __user * buffer, size_t length)
 				RxWriteIndex++;
 				if(RxWriteIndex >= NUM_Q_ELEM)
 					RxWriteIndex=0;
-				//	printk("!!");
 				rx_channel_num_empty_bds--;
-				//	 kfree(cachePages);
-
 
 			}
 
@@ -1020,34 +781,23 @@ static int DmaSetupReceive( int num ,const char __user * buffer, size_t length)
 			spin_unlock_irqrestore(&chann->channel_lock, flags);
 
 		}
-
-
-
 	}
 
 	else 
 	{
-
-		// printk("No Room for Pkts BD full \n");
-
 		return -1; 
 	}
 
 
 	kfree(cachePages);
-
-
-
 	return total;
 }
 
 
-#if 0
+#ifdef USE_LATER
 int data_rxaux_function(ps_pcie_dma_chann_desc_t *data)
 {
 	int retval;
-	//unsigned int num_pkts = 0;
-	//unsigned long flags;
 	int i=0;
 	ps_pcie_dma_chann_desc_t *chann = (ps_pcie_dma_chann_desc_t *)data;
 	unsigned int packet_size =0;
@@ -1070,11 +820,8 @@ int data_rxaux_function(ps_pcie_dma_chann_desc_t *data)
 		{
 			if(chann->chann_state == XLNX_DMA_CNTXTQ_SATURATED || chann->chann_state == XLNX_DMA_CHANN_SATURATED) 
 			{
-				//	set_task_state(current, TASK_INTERRUPTIBLE);   
-				//	printk(KERN_ERR"\n --> Rx BDs saturated \n");
 				//spin_unlock_irqrestore(&chann->channel_lock, flags);
 				spin_unlock_bh(&chann->channel_lock);
-				//	schedule();
 			}
 			else
 			{
@@ -1093,8 +840,6 @@ int data_rxaux_function(ps_pcie_dma_chann_desc_t *data)
 
 
 	}
-
-
 
 	return 0;
 }
@@ -1140,7 +885,6 @@ xraw_dev_ioctl (struct file *filp,
 {
 	int retval = 0;
 	TestCmd tc;
-	int reg_val;
 	u8 __iomem *gen_chk_reg_vbaseaddr = ptr_txapp_dma_desc->cntrl_func_virt_base_addr + GEN_CHECK_OFFSET_START;
 	/* Check cmd type and value */
 	if (_IOC_TYPE (cmd) != XPMON_MAGIC)
@@ -1180,10 +924,10 @@ xraw_dev_ioctl (struct file *filp,
 			if (RawTestMode & TEST_START)
 			{
 
-#if 0	
+#ifdef USE_LATER	
 				if (RawTestMode & ENABLE_PKTCHK)
 				{
-#if 0
+#ifdef USE_LATER
 					reg_val =RD_DMA_REG(gen_chk_reg_vbaseaddr,ENABLE_CHK);
 					reg_val &= ~( GENCHK_ENABLE);
 					printk("##CHECKER Disable reg %d  %x  ##\n",reg_val,RD_DMA_REG(gen_chk_reg_vbaseaddr,ENABLE_CHK));	
@@ -1251,7 +995,7 @@ xraw_dev_ioctl (struct file *filp,
 				 * loopback test was going on - allows the loopback path
 				 * to drain off packets. Just stopping the source of packets.
 				 */
-#if 0		   
+#ifdef USE_LATER		   
 				if (RawTestMode & ENABLE_PKTCHK)
 				{
 					reg_val =RD_DMA_REG(gen_chk_reg_vbaseaddr,ENABLE_CHK);
@@ -1398,14 +1142,12 @@ xraw_dev_read (struct file *file,
 	return ret_pack;
 }
 
-#if 0
+#ifdef USE_LATER
 
 int data_txaux_function(ps_pcie_dma_chann_desc_t *data)
 {
 	int retval;
 	int i=0;
-	//unsigned int num_pkts = 0;
-	//unsigned long flags;
 	ps_pcie_dma_chann_desc_t *chann = (ps_pcie_dma_chann_desc_t *)data;
 
 
@@ -1429,11 +1171,8 @@ int data_txaux_function(ps_pcie_dma_chann_desc_t *data)
 		{
 			if(chann->chann_state == XLNX_DMA_CNTXTQ_SATURATED || chann->chann_state == XLNX_DMA_CHANN_SATURATED) 
 			{
-				//set_task_state(current, TASK_INTERRUPTIBLE);   
-				printk(KERN_ERR"\n Rx BDs saturated \n");
 				//spin_unlock_irqrestore(&chann->channel_lock, flags);
 				spin_unlock_bh(&chann->channel_lock);
-				//	schedule();
 			}
 			else
 			{
@@ -1460,7 +1199,6 @@ int data_txaux_function(ps_pcie_dma_chann_desc_t *data)
 int rx_driver_init(void)
 {
 	int retval = 0;
-	int i;
 
 	platform_t pfrom = HOST;
 
@@ -1482,8 +1220,6 @@ int rx_driver_init(void)
 		unsigned int data_q_addr_lo;
 		unsigned int sta_q_addr_hi;
 		unsigned int sta_q_addr_lo;
-		char name_buf[50];
-		direction_t dir;
 
 
 		ret = xlnx_get_dma_channel(ptr_rxapp_dma_desc, RX_CHANNEL, 
@@ -1519,7 +1255,7 @@ int rx_driver_init(void)
 	}
 
 
-#if 0
+#ifdef USE_LATER
 
 	ps_pcie_dma_desc_t* ptr_rxauxdma_desc = xlnx_get_pform_dma_desc((void*)NULL, 0, 0);
 
@@ -1575,19 +1311,6 @@ int rx_driver_init(void)
 		{
 			struct task_struct* task = NULL;
 			sprintf(name_buf,"DataRxChann%d Thread",i);
-#if 0
-			/* Spawn a kernel thread to pump data */
-			task = kthread_run(&data_rxaux_function,(void *)ptr_rxauxchan_s2c,name_buf);
-			if(task == NULL) 
-			{
-				printk(KERN_ERR"\n Thread spawning failed for channel %d",RX_CHANNEL);
-				goto error;
-			}
-			else
-			{
-				printk(KERN_ERR"\n Thread spawning success for channel %d",RX_CHANNEL);
-			}
-#endif		
 		}
 
 
@@ -1643,8 +1366,6 @@ int host_pump_driver_init(void)
 		unsigned int data_q_addr_lo;
 		unsigned int sta_q_addr_hi;
 		unsigned int sta_q_addr_lo;
-		char name_buf[50];
-		direction_t dir;
 
 
 		ret = xlnx_get_dma_channel(ptr_txapp_dma_desc, TX_CHANNEL, 
@@ -1680,7 +1401,7 @@ int host_pump_driver_init(void)
 
 	}
 
-#if 0
+#ifdef USE_LATER
 	{
 
 
@@ -1743,19 +1464,6 @@ int host_pump_driver_init(void)
 				ret = data_txaux_function(ptr_Auxchan_s2c );
 				if(ret <0)
 					printk("Failed to Run Tx Aux Function ");
-#if 0
-				/* Spawn a kernel thread to pump data */
-				task = kthread_run(&data_txaux_function,(void *)ptr_Auxchan_s2c,name_buf);
-				if(task == NULL) 
-				{
-					printk(KERN_ERR"\n--> Thread spawning failed for channel %d",TX_CHANNEL);
-					goto error;
-				}
-				else
-				{
-					printk(KERN_ERR"\n--> Thread spawning success for channel %d",TX_CHANNEL);
-				}
-#endif				
 			}
 
 
@@ -1872,8 +1580,6 @@ channel_q_alloc0_failed:
 
 static void host_pump_driver_exit(void)
 {
-	int i;
-
 	u8 __iomem *gen_chk_reg_vbaseaddr = ptr_txapp_dma_desc->cntrl_func_virt_base_addr ;
 	WR_DMA_REG(gen_chk_reg_vbaseaddr,NW_PATH0_OFFSET + XXGE_TC_OFFSET ,0x80000000);
 	WR_DMA_REG(gen_chk_reg_vbaseaddr,NW_PATH0_OFFSET + XXGE_RCW1_OFFSET ,0x80000000);
