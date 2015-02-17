@@ -2017,7 +2017,7 @@ public class MainScreen extends javax.swing.JFrame {
         );
         messagelogPanel1Layout.setVerticalGroup(
             messagelogPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(jScrollPane7, javax.swing.GroupLayout.DEFAULT_SIZE, 199, Short.MAX_VALUE)
+            .addComponent(jScrollPane7, javax.swing.GroupLayout.DEFAULT_SIZE, 205, Short.MAX_VALUE)
         );
 
         jPanel34.setBorder(javax.swing.BorderFactory.createTitledBorder("AXI Throughput"));
@@ -2069,7 +2069,7 @@ public class MainScreen extends javax.swing.JFrame {
             .addGroup(DataPathPanelForOneEC_GCLayout.createSequentialGroup()
                 .addContainerGap()
                 .addGroup(DataPathPanelForOneEC_GCLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(messagelogPanel1, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, 512, Short.MAX_VALUE)
+                    .addComponent(messagelogPanel1, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, 520, Short.MAX_VALUE)
                     .addComponent(jPanel33, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                     .addComponent(jPanel31, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                     .addComponent(jPanel34, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
@@ -2489,7 +2489,7 @@ public class MainScreen extends javax.swing.JFrame {
         jPanel1Layout.setVerticalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel1Layout.createSequentialGroup()
-                .addContainerGap(31, Short.MAX_VALUE)
+                .addContainerGap(43, Short.MAX_VALUE)
                 .addComponent(PcieEndStatuspanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addComponent(hostCreditsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
@@ -2688,8 +2688,10 @@ public class MainScreen extends javax.swing.JFrame {
                 ethTestStarted1 = false;
                 jbuttonEngStart2.setText("Start");
                 int size = Integer.parseInt(sizeTextField2.getText());
-                di.stopTest(0, eth1TestMode, size);
+                int distatus = di.stopTest1(1, eth1TestMode, size);
+                //System.out.println("distatus after stop " + distatus);
             }
+            
             System.gc();
             di.flush();
             lp.uninstallDrivers(this);
@@ -3049,6 +3051,7 @@ public class MainScreen extends javax.swing.JFrame {
 
         }
         if (jbuttonEngStart1.getText().equalsIgnoreCase("Start")) {
+
             jbuttonEngStart1.setText("Stop");
             if (loopbackCheckBox1.isSelected()) {
                 eth0TestMode = DriverInfo.ENABLE_LOOPBACK;
@@ -3067,6 +3070,11 @@ public class MainScreen extends javax.swing.JFrame {
             }
 
             int size = Integer.parseInt(sizeTextField1.getText());
+            if (screenMode == 3 && (size > 16383 || size < 64)) {
+                jbuttonEngStart1.setText("Start");
+                JOptionPane.showMessageDialog(this, "Packet size must be 64 to 16384.");
+                return;
+            }
             di.startTest(0, eth0TestMode, size);
             ethTestStarted0 = true;
             // Disabling all components
@@ -3143,7 +3151,11 @@ public class MainScreen extends javax.swing.JFrame {
             }
 
             int size = Integer.parseInt(sizeTextField2.getText());
-
+            if (screenMode == 3 && (size > 16383 || size < 64)) {
+                jbuttonEngStart2.setText("Start");
+                JOptionPane.showMessageDialog(this, "Packet size must be 64 to 16384.");
+                return;
+            }
             di.startTest1(1, eth1TestMode, size);
             ethTestStarted1 = true;
             // Disabling all components
@@ -3181,7 +3193,8 @@ public class MainScreen extends javax.swing.JFrame {
                 chartTopEth.reset();
             }
             int size = Integer.parseInt(sizeTextField2.getText());
-            di.stopTest1(1, eth1TestMode, size);
+            int dival = di.stopTest1(1, eth1TestMode, size);
+//            System.out.println("di stop test 1 result :: " + dival);
         }
     }//GEN-LAST:event_jbuttonEngStart2ActionPerformed
 
@@ -3787,8 +3800,8 @@ public class MainScreen extends javax.swing.JFrame {
             MinorTempLabel.setIcon(ledicons[tempVal % 10]);
             TempMeasureLabel.setText("" + "°C");
 
-            chart1.updateChart((double) ps.vccint / 1000.0,(double) ps.mgtvcc / 1000.0, (double) ps.vccaux / 1000.0,
-                     (double) ps.vccbram / 1000.0);
+            chart1.updateChart((double) ps.vccint / 1000.0, (double) ps.mgtvcc / 1000.0, (double) ps.vccaux / 1000.0,
+                    (double) ps.vccbram / 1000.0);
         } else { // dummy values
             MajorTempLabel.setIcon(ledicons[32 / 10]);
             MinorTempLabel.setIcon(ledicons[32 % 10]);

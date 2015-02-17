@@ -1103,7 +1103,7 @@ public class LandingPage extends javax.swing.JFrame {
 
         @Override
         protected Void doInBackground() throws Exception {
-            if (Develop.production == 1) {
+//            if (Develop.production == 1) {
                 /*Runtime runtime = Runtime.getRuntime();
                  Process process = runtime.exec(new String[]{"/bin/bash", "-c", "./remove_modules.sh"});
                  //process.waitFor();
@@ -1116,7 +1116,7 @@ public class LandingPage extends javax.swing.JFrame {
 
                 int retVal = executeShellScript("./remove_modules.sh");//run_perf_mode
 //                System.out.println("executed the script remove modules ::  " + retVal);
-            }
+//            }
             return null;
         }
 
