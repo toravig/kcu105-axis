@@ -213,7 +213,7 @@ public class MainScreen extends javax.swing.JFrame {
 //                tabbedPanel.remove(sysmonpanel);
 //                tabbedPanel.remove(statusPanel);
 //                tabbedPanel.setLayout(new CardLayout());
-                blockdiagramlbl.setIcon(new ImageIcon(getClass().getResource("/com/xilinx/ultrascale/gui/BlockDiagram_Eth_Raw.png")));
+                blockdiagramlbl.setIcon(new ImageIcon(getClass().getResource("/com/xilinx/ultrascale/gui/BlockDiagram_Eth_Raw.jpg")));
                 sizeTextField1.setText("16383");
                 sizeTextField2.setText("16383");
                 headinglable.setText("AXI Stream Dataplane : Performance mode (Raw Ethernet)");
