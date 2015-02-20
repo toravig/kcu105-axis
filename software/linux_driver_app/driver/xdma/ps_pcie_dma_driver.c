@@ -574,7 +574,7 @@ static long xdma_dev_ioctl(struct file * filp,
 #endif
 #ifdef DDR_DESIGN
 			Status_Reg = XIo_In32(base + USER_BASE + 0x4);	
-			lstats.DdrCalib0 = (Status_Reg) & 0x1  /* 1st bit 'on' of Status Register indicated DDR3 Calibration done*/
+			lstats.DdrCalib0 = (Status_Reg) & 0x1;  /* 1st bit 'on' of Status Register indicated DDR3 Calibration done*/
 #endif 
 				if(copy_to_user((LedStats *)arg, &lstats, sizeof(LedStats)))
 				{

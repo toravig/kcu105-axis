@@ -100,7 +100,7 @@
 
 /* Supported device ids */
 #define NWL_DMA_VAL_DEVID (0x8083)
-#define NWL_DMA_VAL_DEVID_VIDEO (0x8043)
+#define NWL_DMA_VAL_DEVID_VIDEO (0x8183)
 #define NWL_DMA_x4G1_PFMON_DEVID (0x7024) //x4g1 perfmon
 #define NWL_DMA_HW_SGL_CNTRL (0x8082) //SGL controlled by HW logic
 #define NWL_DMA_HW_SGL_ETHER (0x8182) //SGL controlled by HW logic
