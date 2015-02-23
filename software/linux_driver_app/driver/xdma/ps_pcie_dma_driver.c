@@ -881,7 +881,7 @@ static int /*__devinit*/ nwl_dma_probe(struct pci_dev *pdev,
 	 */
 	/* First allocate a major/minor number. */
 	chrRet = alloc_chrdev_region(&xdmaDev, 0, 1, "xdma_stats");
-	if(IS_ERR((int *)chrRet))
+	if(chrRet < 0)
 		printk(KERN_ERR "Error allocating char device region\n");
 	else
 	{
