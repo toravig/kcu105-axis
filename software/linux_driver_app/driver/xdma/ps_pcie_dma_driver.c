@@ -569,8 +569,8 @@ static long xdma_dev_ioctl(struct file * filp,
 #ifdef ETH_APP
 			Status_Reg = XIo_In32(base +USER_BASE + 0x418);
 
-			lstats.Phy0 = (Status_Reg && 0x000000FF) & 0x1;  /* 30th bit 'on' of Status Register indicated Phy 0 link up */
-			lstats.Phy1 = (Status_Reg && 0x0000FF00) & 0x1;  /* 31st bit 'on' of Status Register indicated Phy 1 link up */
+			lstats.Phy0 = Status_Reg & 0x1;  /* 0th bit 'on' of Status Register indicated Phy 0 link up */
+			lstats.Phy1 = (Status_Reg >> 8) & 0x1;  /* 8th bit 'on' of Status Register indicated Phy 1 link up */
 #endif
 #ifdef DDR_DESIGN
 			Status_Reg = XIo_In32(base + USER_BASE + 0x4);	
