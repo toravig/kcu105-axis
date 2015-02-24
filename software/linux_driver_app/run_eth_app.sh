@@ -10,7 +10,7 @@ if [ "$?" != "0" ]; then
 	echo "Error in cleaning Ethernet App Driver"
 	exit $compilation_clean_error;
 fi
-make DRIVER_MODE=ETHERNETAPP
+make DRIVER_MODE=ETHERNETAPP 1>/dev/null 2>&1
 if [ "$?" != "0" ]; then
 	echo "Error in compiling Ethernet App Driver"
 	exit $compilation_error;
