@@ -1,4 +1,4 @@
-rm -rf *.so ../*.so ../64/*.so
+rm -rf *.so ../*.so ../64/libxilinxlib.so
 
 g++ -o libxilinxlib.so -fpermissive -DK7_TRD -DPM_SUPPORT -shared -lpthread -Wl,-soname,libxilinx.so -I/usr/java/latest/include/ -I/usr/java/latest/include/linux -I. com_xilinx_ultrascale_jni_DriverInfoGen.cpp threads.cpp -Bstatic -lc -fPIC
 #g++ -o libxilinxlib.so -fpermissive -DK7_TRD -DPM_SUPPORT -shared -lpthread -Wl,-soname,libxilinx.so -I/usr/lib/jvm/java-1.6.0-openjdk/include -I/usr/lib/jvm/java-1.6.0-openjdk/include/linux -I. com_xilinx_ultrascale_jni_DriverInfoGen.cpp threads.cpp -Bstatic -lc -fPIC
