@@ -1765,6 +1765,7 @@
                 <Component class="javax.swing.JTextField" name="sizeTextField1">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="32768"/>
+                    <Property name="toolTipText" type="java.lang.String" value="Packet Size 64 - 16383"/>
                   </Properties>
                   <Events>
                     <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="sizeTextField1ActionPerformed"/>
@@ -1975,6 +1976,7 @@
                 <Component class="javax.swing.JTextField" name="sizeTextField2">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="32768"/>
+                    <Property name="toolTipText" type="java.lang.String" value="Packet Side 64 - 16383"/>
                   </Properties>
                   <Events>
                     <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="sizeTextField2ActionPerformed"/>

@@ -1632,6 +1632,7 @@ public class MainScreen extends javax.swing.JFrame {
         jLabel19.setVerticalAlignment(javax.swing.SwingConstants.TOP);
 
         sizeTextField1.setText("32768");
+        sizeTextField1.setToolTipText("Packet Size 64 - 16383");
         sizeTextField1.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 sizeTextField1ActionPerformed(evt);
@@ -1771,6 +1772,7 @@ public class MainScreen extends javax.swing.JFrame {
         jLabel20.setVerticalAlignment(javax.swing.SwingConstants.TOP);
 
         sizeTextField2.setText("32768");
+        sizeTextField2.setToolTipText("Packet Side 64 - 16383");
         sizeTextField2.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 sizeTextField2ActionPerformed(evt);
@@ -3100,7 +3102,7 @@ public class MainScreen extends javax.swing.JFrame {
             int size = Integer.parseInt(sizeTextField1.getText());
             if (screenMode == 3 && (size > 16383 || size < 64)) {
                 jbuttonEngStart1.setText("Start");
-                JOptionPane.showMessageDialog(this, "Packet size must be 64 to 16384.");
+                JOptionPane.showMessageDialog(this, "Packet size must be 64 to 16383.");
                 return;
             }
             di.startTest(0, eth0TestMode, size);
@@ -3181,7 +3183,7 @@ public class MainScreen extends javax.swing.JFrame {
             int size = Integer.parseInt(sizeTextField2.getText());
             if (screenMode == 3 && (size > 16383 || size < 64)) {
                 jbuttonEngStart2.setText("Start");
-                JOptionPane.showMessageDialog(this, "Packet size must be 64 to 16384.");
+                JOptionPane.showMessageDialog(this, "Packet size must be 64 to 16383.");
                 return;
             }
             di.startTest1(1, eth1TestMode, size);
