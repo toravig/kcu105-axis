@@ -15,7 +15,7 @@
  ** THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
  ** EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  ** MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- ** NONINFRINGEMENT. IN NO EVENT SHALL THE X CONSORTIUM BE LIABLE FOR ANY
+ ** NONINFRINGEMENT. IN NO EVENT SHALL XILINX BE LIABLE FOR ANY
  ** CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
  ** TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  ** SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -425,6 +425,8 @@ static int ReadPCIState(void * pdev, PCIState * pcistate)
 #else
 	pcistate->DeviceId = NWL_DMA_HW_SGL_CNTRL;
 #endif
+#elif defined(VIDEO_ACC_DESIGN)
+	pcistate->DeviceId = NWL_DMA_VAL_DEVID_VIDEO;
 #else
 	pcistate->DeviceId = NWL_DMA_VAL_DEVID;
 #endif
@@ -935,6 +937,7 @@ static int /*__devinit*/ nwl_dma_probe(struct pci_dev *pdev,
 
 	//TODO free up resources for each label
 interrupt_registration_failed:
+msix_hndlr_registration_failed:
 err_dma:
 err_pci_reg:
 err_ioremap:
@@ -1093,14 +1096,14 @@ static /*inline*/ void ps_pcie_post_process_rx_qs(/*ps_pcie_dma_chann_desc_t*/st
 	}
 
 	//spin_lock_irqsave(&ptr_chann_desc->channel_lock, flags);
-	LOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
+	//LOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 	//spin_lock(&ptr_chann_desc->channel_lock);
 
 
 	/* Go through the status q BD elements */
 	ptr_sta_desc = &ptr_chann_desc->ptr_sta_q[ptr_chann_desc->idx_sta_q];
 
-	UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
+	//UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 	while(ptr_sta_desc->completed ) 
 	{
 		data_q_cntxt_t *ptr_ctx = NULL;
@@ -1111,7 +1114,7 @@ static /*inline*/ void ps_pcie_post_process_rx_qs(/*ps_pcie_dma_chann_desc_t*/st
 		unsigned int offset = 0;
 		void *data = NULL;
 		func_ptr_dma_chann_cbk_noblock cbk;
-		LOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
+	//	LOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 #ifdef DBG_PRNT
 		printk(KERN_ERR"\nStatus Q BD element index %d\n",ptr_chann_desc->idx_sta_q);
 #endif
@@ -1332,19 +1335,17 @@ static /*inline*/ void ps_pcie_post_process_rx_qs(/*ps_pcie_dma_chann_desc_t*/st
 		}
 
 
+		LOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 		if(cbk != NULL /*&& ptr_chann_desc->chann_state != XLNX_DMA_CHANN_IO_QUIESCED*/) 
 		{
 			/* Fire callback */
 			cbk(ptr_chann_desc, data, compl_bytes, uid, num_frags);
 		}
-
-
-		ptr_chann_desc->yield_weight--;
 		UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 
 	}
 
-	LOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
+	//LOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 
 	{
 		unsigned int regval;
@@ -1368,7 +1369,7 @@ static /*inline*/ void ps_pcie_post_process_rx_qs(/*ps_pcie_dma_chann_desc_t*/st
 		WR_DMA_REG(ptr_chan_dma_reg_vbaddr, offset,regval);
 	}
 	//spin_unlock_irqrestore(&ptr_chann_desc->channel_lock, flags);
-	UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock/*, flags*/);
+	//UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock/*, flags*/);
 	//spin_unlock(&ptr_chann_desc->channel_lock/*, flags*/);
 
 }
@@ -1400,14 +1401,12 @@ static /*inline*/ void ps_pcie_post_process_tx_qs(/*ps_pcie_dma_chann_desc_t*/st
 	}
 
 	//spin_lock_irqsave(&ptr_chann_desc->channel_lock, flags);
-	LOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
+	//LOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 	//spin_lock(&ptr_chann_desc->channel_lock);
 
 	/* Go through the status q BD elements */
 	ptr_sta_desc = &ptr_chann_desc->ptr_sta_q[ptr_chann_desc->idx_sta_q];
-
-	ptr_chann_desc->yield_weight = PKT_YIELD_CNT_PER_CHANN;
-	UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
+	//UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 
 	while(ptr_sta_desc->completed ) 
 	{
@@ -1419,7 +1418,7 @@ static /*inline*/ void ps_pcie_post_process_tx_qs(/*ps_pcie_dma_chann_desc_t*/st
 		void *data = NULL;
 		func_ptr_dma_chann_cbk_noblock cbk;
 
-		LOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
+	//	LOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 #ifdef DBG_PRNT
 		printk(KERN_ERR"\nStatus Q BD element index %d\n",ptr_chann_desc->idx_sta_q);
 #endif
@@ -1616,6 +1615,7 @@ static /*inline*/ void ps_pcie_post_process_tx_qs(/*ps_pcie_dma_chann_desc_t*/st
 			ptr_chann_desc->chann_state = XLNX_DMA_CHANN_NO_ERR;
 		}
 
+		LOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 		if(cbk != NULL /*&& ptr_chann_desc->chann_state != XLNX_DMA_CHANN_IO_QUIESCED*/) 
 		{
 			/* Fire callback */
@@ -1634,7 +1634,7 @@ static /*inline*/ void ps_pcie_post_process_tx_qs(/*ps_pcie_dma_chann_desc_t*/st
 		cbk_all(ptr_chann_desc, data_all, compl_bytes, uid, num_frags_all);
 	}
 #endif
-	LOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
+	//LOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 
 
 	if(ptr_chann_desc->ptr_dma_desc->pform == EP) 
@@ -1656,7 +1656,7 @@ static /*inline*/ void ps_pcie_post_process_tx_qs(/*ps_pcie_dma_chann_desc_t*/st
 
 
 	//spin_unlock_irqrestore(&ptr_chann_desc->channel_lock, flags);
-	UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
+	//UNLOCK_DMA_CHANNEL(&ptr_chann_desc->channel_lock);
 	//spin_unlock(&ptr_chann_desc->channel_lock);
 
 }
@@ -1750,6 +1750,9 @@ static inline void ps_pcie_chann_intr_handlr(ps_pcie_dma_chann_desc_t *ptr_chann
 
 
 			}
+			val= RD_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_PCIE_INTR_CNTRL_REG_OFFSET);
+                	val |= DMA_INTCNTRL_ENABLINTR_BIT;
+		 	WR_DMA_REG(ptr_chann_desc->chan_dma_reg_vbaddr, DMA_PCIE_INTR_CNTRL_REG_OFFSET,val);
 #endif
 		}
 

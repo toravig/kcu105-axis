@@ -16,7 +16,7 @@
  ** THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
  ** EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  ** MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- ** NONINFRINGEMENT. IN NO EVENT SHALL THE X CONSORTIUM BE LIABLE FOR ANY
+ ** NONINFRINGEMENT. IN NO EVENT SHALL XILINX BE LIABLE FOR ANY
  ** CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
  ** TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  ** SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -591,16 +591,13 @@ static int DmaSetupTransmit( int num ,const char __user * buffer, size_t length)
 			}
 
 
-			spin_lock_irqsave(&chann->channel_lock, flags);
-			//spin_lock_bh(&chann->channel_lock);
+			//spin_lock_irqsave(&chann->channel_lock, flags);
+			  spin_lock_bh(&chann->channel_lock);
 			//spin_lock(&chann->channel_lock);
 			retval = xlnx_data_frag_io(chann,pbuf->pktBuf,PHYS_ADDR, pbuf->size ,cbk_data_pump ,/*num_pkts+1*/1, last_frag, /*OUT,*/Dqueue);
 			if(retval < XLNX_SUCCESS) 
 			{
 				int state = chann->chann_state;
-
-				//spin_unlock_irqrestore(&chann->channel_lock, flags);
-
 				dma_unmap_page(chann->ptr_dma_desc->dev,(dma_addr_t)pbuf->pktBuf,pbuf->size,DMA_TO_DEVICE);
 				page_cache_release(cachePages[j]);
 
@@ -613,8 +610,8 @@ static int DmaSetupTransmit( int num ,const char __user * buffer, size_t length)
 
 					//ptr_chan_s2c_0->chann_state = XLNX_DMA_CHANN_NO_ERR;
 
-					spin_unlock_irqrestore(&chann->channel_lock, flags);
-					//spin_unlock(&chann->channel_lock);
+				//	spin_unlock_irqrestore(&chann->channel_lock, flags);
+					spin_unlock_bh(&chann->channel_lock);
 
 				}
 
@@ -631,8 +628,8 @@ static int DmaSetupTransmit( int num ,const char __user * buffer, size_t length)
 
 				//	 kfree(cachePages);
 
-				spin_unlock_irqrestore(&chann->channel_lock, flags);
-				//	spin_unlock(&chann->channel_lock);
+				//spin_unlock_irqrestore(&chann->channel_lock, flags);
+					spin_unlock_bh(&chann->channel_lock);
 			}
 
 
@@ -755,9 +752,9 @@ static int DmaSetupReceive( int num ,const char __user * buffer, size_t length)
 			}
 
 
-			spin_lock_irqsave(&chann->channel_lock, flags);
+			//spin_lock_irqsave(&chann->channel_lock, flags);
 			//  spin_lock(&chann->channel_lock);
-			//		spin_lock_bh(&chann->channel_lock);
+			spin_lock_bh(&chann->channel_lock);
 			retval = xlnx_data_frag_io(chann,(unsigned char *)bufPA,PHYS_ADDR, pbuf->size ,cbk_data_rxpump ,/*num_pkts+1*/1, last_frag, /*OUT,*/ Rxqueue);
 			if(retval < XLNX_SUCCESS) 
 			{
@@ -797,9 +794,9 @@ static int DmaSetupReceive( int num ,const char __user * buffer, size_t length)
 
 			}
 
-			//	spin_unlock(&chann->channel_lock);
+				spin_unlock_bh(&chann->channel_lock);
 
-			spin_unlock_irqrestore(&chann->channel_lock, flags);
+			//spin_unlock_irqrestore(&chann->channel_lock, flags);
 
 		}
 
@@ -1260,7 +1257,7 @@ int rx_driver_init(void)
 
 		ret = xlnx_activate_dma_channel(ptr_rxapp_dma_desc, ptr_rxchan_s2c,
 				data_q_addr_hi,data_q_addr_lo,q_num_elements,
-				sta_q_addr_hi,sta_q_addr_lo,q_num_elements, 0);
+				sta_q_addr_hi,sta_q_addr_lo,q_num_elements, COALESE_CNT);
 		if(ret < XLNX_SUCCESS) 
 		{
 			printk(KERN_ERR"\n Could not activate s2c returned %d\n", ret);
@@ -1317,7 +1314,7 @@ int rx_driver_init(void)
 
 		ret = xlnx_activate_dma_channel(ptr_rxauxapp_dma_desc, ptr_rxauxchan_s2c,
 				data_q_addr_hi,data_q_addr_lo,q_num_elements,
-				sta_q_addr_hi,sta_q_addr_lo,q_num_elements, 0);
+				sta_q_addr_hi,sta_q_addr_lo,q_num_elements, COALESE_CNT);
 		if(ret < XLNX_SUCCESS) 
 		{
 			printk(KERN_ERR"\n Could not activate s2c %d channel %d\n", ret);
@@ -1466,7 +1463,7 @@ int host_pump_driver_init(void)
 
 			ret = xlnx_activate_dma_channel(ptr_TxAuxapp_dma_desc, ptr_Auxchan_s2c,
 					data_q_addr_hi,data_q_addr_lo,q_num_elements,
-					sta_q_addr_hi,sta_q_addr_lo,q_num_elements, 0);
+					sta_q_addr_hi,sta_q_addr_lo,q_num_elements, COALESE_CNT);
 			if(ret < XLNX_SUCCESS) 
 			{
 				printk(KERN_ERR"\n Could not activate s2c %d channel %d\n",ret);
