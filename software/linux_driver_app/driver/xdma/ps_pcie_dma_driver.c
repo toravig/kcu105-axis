@@ -408,7 +408,7 @@ static int ReadPCIState(void * pdev, PCIState * pcistate)
 {
 	int pos;
 	u16 valw;
-	u8 valb;
+	u16 valw1;
 #ifdef USE_LATER
 	int reg=0,linkUpCap=0;
 #endif
@@ -433,20 +433,23 @@ static int ReadPCIState(void * pdev, PCIState * pcistate)
 
 
 	/* Read Interrupt setting - Legacy or MSI/MSI-X */
-	pci_read_config_byte(pdev, PCI_INTERRUPT_PIN, &valb);
-	if(!valb)
+		
+	pcistate->IntMode = INT_LEGACY;//Default set to Legacy 
+
+	if((pos=pci_find_capability(pdev, PCI_CAP_ID_MSIX)))
 	{
-		if(pci_find_capability(pdev, PCI_CAP_ID_MSIX))
-			pcistate->IntMode = INT_MSIX;
-		else if(pci_find_capability(pdev, PCI_CAP_ID_MSI))
-			pcistate->IntMode = INT_MSI;
-		else
-			pcistate->IntMode = INT_NONE;
+		pci_read_config_word(pdev,(pos + PCI_MSIX_FLAGS),&valw1);
+		if(valw1 & PCI_MSIX_FLAGS_ENABLE)
+		pcistate->IntMode = INT_MSIX;
 	}
-	else if((valb >= 1) && (valb <= 4))
-		pcistate->IntMode = INT_LEGACY;
-	else
-		pcistate->IntMode = INT_NONE;
+	if((pos=pci_find_capability(pdev, PCI_CAP_ID_MSI)))
+	{               
+                pci_read_config_word(pdev,(pos + PCI_MSI_FLAGS),&valw1);
+                if(valw1 & PCI_MSI_FLAGS_ENABLE)
+                pcistate->IntMode = INT_MSI;
+        }
+
+
 	if((pos = pci_find_capability(pdev, PCI_CAP_ID_EXP)))
 	{
 		/* Read Link Status */
@@ -865,8 +868,6 @@ static int /*__devinit*/ nwl_dma_probe(struct pci_dev *pdev,
 					printk(KERN_ERR"\nMSIx Interrupt handler registered\n");
 				}
 			}
-
-
 		}
 	}
 #else
